@@ -48,6 +48,7 @@ import os
 import re
 import sys
 import time
+import traceback
 import zipfile
 
 try:
@@ -860,8 +861,7 @@ def main():
                 continue
 
             body = up.process_images(body, pdir, img_cache)   # upload images, center them
-            # source = 'CSES (https://cses.fi/problemset/task/%s)' % pid
-            source = 'CSES' % pid
+            source = 'CSES (https://cses.fi/problemset/task/%s)' % pid
             if not exists:
                 up.create_problem(code, name, body, tl, mem, opt.points, opt.partial,
                                   source, opt.group,
@@ -915,7 +915,14 @@ def main():
             created += 1
         except Exception as e:
             failed += 1
-            print('[%s] %s -> FAILED: %s' % (pid, name, e))
+            tbs = traceback.extract_tb(e.__traceback__)
+            loc = ''
+            if tbs:
+                last = tbs[-1]
+                loc = ' [%s:%d]' % (os.path.basename(last.filename), last.lineno)
+            print('[%s] %s -> FAILED: %s%s' % (pid, name, e, loc))
+            if failed == 1 or opt.debug:          # show full traceback for the first failure
+                traceback.print_exc()
         time.sleep(opt.sleep)
 
     if not opt.no_publish and created:

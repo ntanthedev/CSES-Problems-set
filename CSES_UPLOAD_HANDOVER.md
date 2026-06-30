@@ -156,11 +156,14 @@ All confirmed by reading the `ntanthedev/CHT-oj` source.
   `authors` (optional, leave empty), `content`. Formset prefix **`solution`**.
 - Strategy: GET the edit form → keep every field → fill one solution row → POST.
 
-### Publish (bulk) — admin action
-- `POST /admin/judge/problem/?q=cses_` with action
-  `make_public_and_update_publish_date`, `select_across=1` → publishes **all** `cses_*`
-  at once (`is_public=True`, `date=now`, rescore). Runs automatically at the end unless
-  `--no-publish`.
+### Publish / unpublish (bulk) — admin actions
+- `POST /admin/judge/problem/?q=cses_` with `select_across=1` and action
+  `make_public_and_update_publish_date` → publishes **all** `cses_*` at once
+  (`is_public=True`, `date=now`, rescore); or action `make_private` → hides them.
+- Auto-runs (publish) at the end of an upload unless `--no-publish`.
+- Exposed standalone via `--publish-only` / `--unpublish-only` (no upload). With `--only`
+  it resolves each problem's admin pk and acts on just that subset
+  (`_selected_action=<pk>`); without `--only` it acts on the whole `cses_*` set.
 
 ### Markdown / math
 - Renderer `markdown2` + `latex` extra: regex `(~.*?~)|(\$\$.*?\$\$)` → inline `~...~`,
@@ -206,9 +209,11 @@ Martor editor confuses the stdlib HTML parser).
 --testcase-visibility {visible|out-contest|authors}   default "visible" (= "Có thể xem")
 --with-editorial         upload analysis_<lang>.md as the editorial (Solution)
 --editorial-public       make the editorial publicly visible
---no-publish             do NOT bulk-publish at the end
---overwrite              refresh existing problems (statement/limits + test data)
---only ID [ID ...]       restrict to specific CSES IDs
+--no-publish             upload but DON'T publish at the end (problems stay hidden)
+--publish-only           don't upload — just make cses_* problems PUBLIC, then exit
+--unpublish-only         don't upload — just make cses_* problems PRIVATE, then exit
+--overwrite              refresh existing problems (statement/limits + test data + editorial)
+--only ID [ID ...]       restrict to specific CSES IDs (also scopes publish/unpublish-only)
 --sleep SECONDS          delay between problems (default 0.5)
 --dry-run                parse locally and report; no network
 --debug                  print full tracebacks and dump pages on form-not-found
@@ -232,6 +237,31 @@ Refresh an already-uploaded group (also repairs old problems missing group/type)
 python upload.py --user ntannn --root . --only <IDs...> \
     --vi --with-editorial --editorial-public --overwrite
 ```
+
+### Resume behaviour (safe to re-run)
+A problem that already exists is **skipped entirely** on a normal run — no re-create,
+no re-upload, no errors, no duplicates. So you can re-run the standard command as many
+times as you like; it only processes the not-yet-uploaded problems. To deliberately
+refresh existing ones, add `--overwrite`.
+
+### Visibility control (publish / hide)
+Problems are created **hidden**. By default the standard command publishes all `cses_*`
+at the end. To control this:
+```bash
+# Upload but keep everything HIDDEN (don't publish at the end):
+python upload.py --user ntannn --root . --vi --with-editorial --editorial-public --no-publish
+
+# Later: make them PUBLIC (no re-upload, just flips visibility, then exits):
+python upload.py --user ntannn --root . --publish-only              # all cses_*
+python upload.py --user ntannn --root . --only 1068 1069 --publish-only   # a subset
+
+# Hide them again:
+python upload.py --user ntannn --root . --unpublish-only            # all cses_*
+python upload.py --user ntannn --root . --only 1068 1069 --unpublish-only # a subset
+```
+`--no-publish` is a *modifier* on an upload run (upload, stay hidden). `--publish-only`
+/ `--unpublish-only` are *standalone* modes that upload nothing and only flip visibility
+via the admin actions `make_public_and_update_publish_date` / `make_private`.
 
 ### Internal notes (for editing the script)
 - `form_defaults(form)` → name→value dict (front-end forms).
