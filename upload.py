@@ -39,11 +39,19 @@ Notes
   dedicated staff account without 2FA that has add_problem / change_problem.
 * Re-running is safe: existing problems are skipped unless --overwrite (which
   re-uploads their test data).
+* Problems needing a non-standard checker (floating point tolerance, "multiple
+  valid answer", "any order") are driven by an optional CHECKER_MANIFEST.json
+  at the repo root - see load_checker_manifest() / CHECKER_MODES below. A
+  problem with no entry keeps today's plain token-compare checker, unchanged.
+  Run `python upload.py --inspect-fields <existing-code>` once against any
+  already-uploaded problem to confirm the live checker/grader field names
+  before trusting this on a real batch.
 """
 
 import argparse
 import datetime
 import getpass
+import json
 import os
 import re
 import sys
@@ -79,6 +87,57 @@ MEM_FACTOR = {'GB': 1024 * 1024, 'MB': 1024, 'KB': 1}
 #   'C' = visible out-contest  ("Hien thi khi khong o trong ky thi")
 #   'O' = authors only         ("Chi tac gia co the xem")  -- the site default
 TESTCASE_VIS = {'visible': 'A', 'out-contest': 'C', 'authors': 'O'}
+
+# --------------------------------------------------------------------------- #
+# Checker support (CHECKER_MANIFEST.json)
+# --------------------------------------------------------------------------- #
+# CHT-oj is a VNOJ/DMOJ fork. The live ProblemData model (judge/models/problem_data.py)
+# defines exactly these choices - confirmed by reading the VNOI-Admin/OJ source, which
+# CHT-oj forked from:
+#
+#   CHECKERS = (('standard', 'Standard'), ('bridged', 'Custom checker'),
+#               ('floats', 'Floats'), ('floatsabs', 'Floats (absolute)'),
+#               ('floatsrel', 'Floats (relative)'), ('identical', 'Byte identical'),
+#               ('linecount', 'Line-by-line'))
+#   CUSTOM_CHECKERS = (('themis', ...), ('testlib', 'Testlib checker'), ('cms', ...),
+#                       ('coci', ...), ('peg', ...), ('default', 'DMOJ checker'))
+#   GRADERS = (('standard', ...), ('interactive', 'Interactive'),
+#              ('signature', 'IOI-style'), ('output_only', ...))
+#
+# NOTE: this fork's CHECKERS list has NO 'sorted'/'unordered' option (stock DMOJ has
+# one, this fork dropped it) - so "any order" problems need a bridged/testlib checker
+# too, same as "multiple valid answer" problems. There is no built-in shortcut for them.
+#
+# We resolve the actual <option value=...> the same way group/type are already
+# resolved: by matching the VISIBLE LABEL text on the live page (Vietnamese first,
+# English/slug as fallback), never by hardcoding a guessed value. This survives
+# translation/relabeling differences between CHT-oj and upstream VNOJ.
+CHECKER_LABELS = {
+    'standard':  ['Mặc định', 'Standard'],
+    'bridged':   ['Trình chấm ngoài', 'Custom checker'],
+    'floats':    ['Số thực', 'Floats'],
+    'floatsabs': ['Số thực (tuyệt đối)', 'Floats (absolute)'],
+    'floatsrel': ['Số thực (tương đối)', 'Floats (relative)'],
+    'identical': ['So sánh byte', 'Byte identical'],
+    'linecount': ['Dòng với dòng', 'Line-by-line'],
+}
+# Sub-format, only used/shown when checker == 'bridged'.
+CHECKER_TYPE_LABELS = {
+    'testlib': ['Testlib checker', 'testlib'],
+    'themis':  ['Themis checker', 'themis'],
+    'cms':     ['CMS checker', 'cms'],
+    'coci':    ['COCI checker', 'coci'],
+    'peg':     ['PEG checker', 'peg'],
+    'default': ['DMOJ checker', 'default'],
+}
+# Not wired up to a POST path yet (see --inspect-fields) - kept here for the
+# follow-up that adds interactive-problem support.
+GRADER_LABELS = {
+    'standard':    ['Standard', 'Mặc định'],
+    'interactive': ['Interactive', 'Tương tác'],
+    'signature':   ['Function Signature Grading (IOI-style)', 'Signature'],
+    'output_only': ['Output Only'],
+}
 
 # VNOJ/DMOJ markdown uses ~...~ for INLINE math and $$...$$ for DISPLAY math.
 # CSES uses $...$ inline, so rewrite inline $...$ -> ~...~ (display $$...$$ kept).
@@ -182,6 +241,44 @@ def read_cases(zip_path):
             order += 1
             cases.append((order, c['in'], c['out']))
     return cases, set(names)
+
+
+# --------------------------------------------------------------------------- #
+# Checker manifest: CHECKER_MANIFEST.json at the repo root, keyed by CSES id.
+# --------------------------------------------------------------------------- #
+# {
+#   "1618": {"checker": "floats", "checker_args": {"precision": 6}},
+#   "1625": {"checker": "bridged", "checker_type": "testlib", "checker_file": "checker.cpp"}
+# }
+# A problem with no entry (the vast majority) keeps today's behaviour: 'standard'.
+# checker_file is a path relative to the problem's own folder (next to solution.cpp).
+CHECKER_MODES = ('standard', 'bridged', 'floats', 'floatsabs', 'floatsrel', 'identical', 'linecount')
+
+
+def load_checker_manifest(root, path=None):
+    path = path or os.path.join(root, 'CHECKER_MANIFEST.json')
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding='utf-8') as f:
+        raw = json.load(f)
+    manifest = {}
+    for pid, spec in raw.items():
+        if not isinstance(spec, dict):
+            continue          # skip metadata keys like _comment, _status
+        pid = str(pid)
+        mode = spec.get('checker', 'standard')
+        if mode not in CHECKER_MODES:
+            sys.exit('CHECKER_MANIFEST.json: problem %s has unknown checker %r (must be one of %s)'
+                     % (pid, mode, ', '.join(CHECKER_MODES)))
+        if mode == 'bridged':
+            ctype = spec.get('checker_type', 'testlib')
+            if ctype not in CHECKER_TYPE_LABELS:
+                sys.exit('CHECKER_MANIFEST.json: problem %s has unknown checker_type %r (must be one of %s)'
+                         % (pid, ctype, ', '.join(CHECKER_TYPE_LABELS)))
+            spec.setdefault('checker_type', ctype)
+            spec.setdefault('checker_file', 'checker.cpp')
+        manifest[pid] = spec
+    return manifest
 
 
 # --------------------------------------------------------------------------- #
@@ -299,6 +396,19 @@ def resolve_option(options, *labels):
         if lab and options.get(lab.lower()):
             return options[lab.lower()]
     return first_nonempty(options)
+
+
+def resolve_strict(options, *labels, field=''):
+    """Like resolve_option, but NEVER silently falls back to "the first option
+    on the page" - for fields like checker/checker_type/grader, guessing wrong
+    doesn't just fail loudly, it uploads with the WRONG checker and grades
+    silently incorrectly. Raises with the full option list if nothing matches."""
+    for lab in labels:
+        if lab and options.get(lab.lower()):
+            return options[lab.lower()]
+    raise RuntimeError(
+        'could not resolve option for %s: tried %r, available labels: %s'
+        % (field, list(labels), sorted(options.keys()) or '(none found - is this the right field name?)'))
 
 
 # magic-byte image type detection (CSES images are hash-named, no extension)
@@ -449,10 +559,14 @@ class Uploader:
         raise RuntimeError('create failed: %s' % show_errors(resp.text))
 
     # -- step 3: test data + cases ------------------------------------------ #
-    def upload_data(self, code, zip_path, cases):
+    def upload_data(self, code, zip_path, cases, checker_spec=None, pdir=None):
         path = '/problem/%s/test_data' % code
         r, soup = self._get_soup(path)
         form = form_containing(soup, 'problem-data-zipfile') or soup.find('form')
+        if form is None:
+            if self.debug:
+                self._diagnose('test_data', r, soup)
+            raise RuntimeError('could not open the test_data form for %s' % code)
         defaults = form_defaults(form) if form else {}
 
         data = {}
@@ -470,6 +584,33 @@ class Uploader:
         data.setdefault('problem-data-output_limit', '')
         data.setdefault('problem-data-io_input_file', '')
         data.setdefault('problem-data-io_output_file', '')
+
+        # ---- optional custom checker (CHECKER_MANIFEST.json entry) --------- #
+        # Only ~85/400 problems need this; everything else keeps the untouched
+        # 'standard' path above. See CHECKER_MODES / CHECKER_LABELS up top.
+        checker_file_path = None
+        if checker_spec:
+            mode = checker_spec.get('checker', 'standard')
+            checker_opts = select_options(form, 'problem-data-checker')
+            data['problem-data-checker'] = resolve_strict(
+                checker_opts, *CHECKER_LABELS[mode], field='problem-data-checker (mode=%s, problem=%s)' % (mode, code))
+
+            args = checker_spec.get('checker_args')
+            if args is not None:
+                data['problem-data-checker_args'] = json.dumps(args, ensure_ascii=False)
+
+            if mode == 'bridged':
+                ctype = checker_spec.get('checker_type', 'testlib')
+                ctype_opts = select_options(form, 'problem-data-checker_type')
+                data['problem-data-checker_type'] = resolve_strict(
+                    ctype_opts, *CHECKER_TYPE_LABELS[ctype],
+                    field='problem-data-checker_type (type=%s, problem=%s)' % (ctype, code))
+                fname = checker_spec.get('checker_file', 'checker.cpp')
+                if not pdir:
+                    raise RuntimeError('bridged checker for %s needs pdir to locate %s' % (code, fname))
+                checker_file_path = os.path.join(pdir, fname)
+                if not os.path.exists(checker_file_path):
+                    raise RuntimeError('checker file not found for %s: %s' % (code, checker_file_path))
 
         n = len(cases)
         data['cases-TOTAL_FORMS'] = str(n)
@@ -489,14 +630,52 @@ class Uploader:
             data[p + 'generator_args'] = ''
             # is_pretest / public / DELETE: unchecked => omit entirely
 
-        with open(zip_path, 'rb') as f:
-            files = {'problem-data-zipfile': (os.path.basename(zip_path), f, 'application/zip')}
-            resp = self.s.post(self.url(path), data=data, files=files,
-                               headers={'Referer': self.url(path)},
-                               allow_redirects=False, timeout=600)
+        with open(zip_path, 'rb') as zf:
+            files = {'problem-data-zipfile': (os.path.basename(zip_path), zf, 'application/zip')}
+            if checker_file_path:
+                with open(checker_file_path, 'rb') as cf:
+                    files['problem-data-custom_checker'] = (os.path.basename(checker_file_path), cf, 'text/x-c++src')
+                    resp = self.s.post(self.url(path), data=data, files=files,
+                                       headers={'Referer': self.url(path)},
+                                       allow_redirects=False, timeout=600)
+            else:
+                resp = self.s.post(self.url(path), data=data, files=files,
+                                   headers={'Referer': self.url(path)},
+                                   allow_redirects=False, timeout=600)
         if resp.status_code in (301, 302):
             return True
+        if self.debug:
+            self._diagnose('test_data_post', resp, BeautifulSoup(resp.text, _PARSER))
         raise RuntimeError('test_data failed: %s' % show_errors(resp.text))
+
+    # -- diagnostic: dump every checker/grader-related field on the live form  #
+    def inspect_fields(self, code):
+        """GET /problem/<code>/test_data and print every field whose name looks
+        checker/grader/io-related, with (for selects) every visible label and
+        its real option value. Use this once against any existing problem to
+        confirm exact field names before wiring up new behaviour (e.g. the
+        'grader'/'custom_grader'/'custom_header' fields needed for interactive
+        problems, which this script does not yet touch)."""
+        path = '/problem/%s/test_data' % code
+        r, soup = self._get_soup(path)
+        form = form_containing(soup, 'problem-data-zipfile') or soup.find('form')
+        if form is None:
+            if self.debug:
+                self._diagnose('test_data', r, soup)
+            raise RuntimeError('could not open the test_data form for %s' % code)
+        print('Fields on %s matching /check|grad|io_method|custom/i :' % path)
+        for el in form.find_all(['input', 'select', 'textarea']):
+            name = el.get('name') or ''
+            if not re.search(r'check|grad|io_method|custom', name, re.I):
+                continue
+            if el.name == 'select':
+                opts = [(o.get_text(strip=True), o.get('value', '')) for o in el.find_all('option')]
+                print('  SELECT   %-38s %s' % (name, opts))
+            else:
+                itype = el.get('type') or el.name
+                print('  %-8s %-38s type=%-8s value=%r' % (el.name.upper(), name, itype, el.get('value', '')))
+
+
 
     # -- images: upload hash files and rewrite references -------------------- #
     def _ensure_csrf(self):
@@ -824,6 +1003,14 @@ def main():
                          'language is added as a translation, e.g. --vi --bilingual keeps vi '
                          'as the main text and adds the English statement as an "en" translation.')
     ap.add_argument('--only', nargs='*', help='Only these CSES IDs (e.g. --only 1068 1083).')
+    ap.add_argument('--checker-manifest', default=None,
+                    help='Path to CHECKER_MANIFEST.json (default: <root>/CHECKER_MANIFEST.json if present). '
+                         'Problems not listed in it keep the standard token-compare checker, unchanged.')
+    ap.add_argument('--inspect-fields', metavar='CODE',
+                    help='Diagnostic: log in, open /problem/CODE/test_data, print every checker/grader/io '
+                         'field name and (for selects) every label->value option, then exit. Use this '
+                         'against any existing problem code to confirm real field names before trusting '
+                         'new behaviour (e.g. before wiring up interactive-problem support).')
     ap.add_argument('--sleep', type=float, default=0.5, help='Seconds to wait between problems.')
     ap.add_argument('--dry-run', action='store_true', help='Parse locally and report; no network.')
     ap.add_argument('--debug', action='store_true',
@@ -836,6 +1023,22 @@ def main():
         sys.exit('--site must be a full URL like https://oj.thptchuyenhatinh.edu.vn '
                  '(you gave: %r). Tip: just omit --site to use the default.' % opt.site)
     only = set(opt.only) if opt.only else None
+    manifest = load_checker_manifest(opt.root, opt.checker_manifest)
+    if manifest:
+        print('Loaded CHECKER_MANIFEST.json: %d problem(s) with a non-standard checker.' % len(manifest))
+
+    # ---- diagnostic mode: dump checker/grader field names, then exit ----
+    if opt.inspect_fields:
+        if not opt.user:
+            sys.exit('--user is required for --inspect-fields.')
+        password = opt.password or getpass.getpass('Admin password for %s: ' % opt.user)
+        up = Uploader(opt.site, debug=opt.debug)
+        up.login(opt.user, password)
+        target = opt.inspect_fields
+        if not target.startswith(opt.code_prefix):
+            target = opt.code_prefix + target
+        up.inspect_fields(target)
+        return
 
     # ---- dry run: just validate local files ----
     if opt.dry_run:
@@ -855,8 +1058,13 @@ def main():
                 print('  [%s] %-40s CORRUPT ZIP (skip)' % (pid, name[:40]))
                 bad += 1
                 continue
-            print('  [%s] %-40s %4.2fs %6dKB  %3d cases  [%s]'
-                  % (pid, name[:40], tl or 0, mem or 0, len(cases), cat))
+            spec = manifest.get(pid)
+            ckr = ''
+            if spec:
+                ckr = '  <checker=%s%s>' % (spec['checker'],
+                                            ':' + spec['checker_type'] if spec.get('checker_type') else '')
+            print('  [%s] %-40s %4.2fs %6dKB  %3d cases  [%s]%s'
+                  % (pid, name[:40], tl or 0, mem or 0, len(cases), cat, ckr))
             ok += 1
         print('\nDry run: %d ok, %d problem(s) to skip.' % (ok, bad))
         return
@@ -918,7 +1126,7 @@ def main():
                 continue
 
             body = up.process_images(body, pdir, img_cache)   # upload images, center them
-            source = 'CSES (https://cses.fi/problemset/task/%s)' % pid
+            source = 'CSES %s' % pid
             if not exists:
                 up.create_problem(code, name, body, tl, mem, opt.points, opt.partial,
                                   source, opt.group,
@@ -935,8 +1143,10 @@ def main():
                 print('[%s] %s -> updated statement/limits' % (pid, name))
 
             if not exists or opt.overwrite:
-                up.upload_data(code, zp, cases)
-                print('       uploaded %d test cases (%.2fs, %dKB)' % (len(cases), tl, mem))
+                checker_spec = manifest.get(pid)
+                up.upload_data(code, zp, cases, checker_spec=checker_spec, pdir=pdir)
+                extra = ' [checker=%s]' % checker_spec['checker'] if checker_spec else ''
+                print('       uploaded %d test cases (%.2fs, %dKB)%s' % (len(cases), tl, mem, extra))
 
             if opt.with_editorial:
                 an = None

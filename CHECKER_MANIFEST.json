@@ -1,0 +1,18 @@
+{
+  "_comment": "CSES problems requiring non-standard checkers. See CHECKER_STRATEGY.md §2.",
+  "_status": {
+    "done_any_order": 4,
+    "done_floats": 5,
+    "todo_multi_valid": 71,
+    "todo_interactive": 6
+  },
+  "1134": {"checker": "bridged", "checker_type": "testlib", "checker_file": "checker_unordered_pairs_symmetric.cpp"},
+  "1725": {"checker": "floats", "checker_args": {"precision": 6}},
+  "1726": {"checker": "floats", "checker_args": {"precision": 6}},
+  "1727": {"checker": "floats", "checker_args": {"precision": 6}},
+  "1728": {"checker": "floats", "checker_args": {"precision": 6}},
+  "2076": {"checker": "bridged", "checker_type": "testlib", "checker_file": "checker_unordered_pairs_symmetric.cpp"},
+  "2077": {"checker": "bridged", "checker_type": "testlib", "checker_file": "checker_unordered_flat.cpp"},
+  "2195": {"checker": "bridged", "checker_type": "testlib", "checker_file": "checker_unordered_pairs_atomic.cpp"},
+  "3361": {"checker": "floats", "checker_args": {"precision": 6}}
+}

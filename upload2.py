@@ -710,16 +710,20 @@ class Uploader:
             self._diagnose('admin_change_post', resp, BeautifulSoup(resp.text, _PARSER))
         raise RuntimeError('add translation failed: %s' % show_errors(resp.text))
 
-    # -- step 4: bulk publish ----------------------------------------------- #
-    def publish_prefix(self, prefix):
+    # -- step 4: bulk publish / unpublish ----------------------------------- #
+    PUBLISH_ACTION = 'make_public_and_update_publish_date'
+    UNPUBLISH_ACTION = 'make_private'
+
+    def set_public_prefix(self, prefix, make_public=True):
+        """Run the publish/unpublish admin action on ALL problems whose code
+        matches `prefix` (via the changelist search + select_across)."""
         path = '/admin/judge/problem/?q=%s' % prefix
         r, soup = self._get_soup(path)
-        form = soup.find('form', id='changelist-form') or form_containing(soup, 'action') or soup.find('form')
-        if form is None:
+        if soup.find('form', id='changelist-form') is None and form_containing(soup, 'action') is None:
             raise RuntimeError('Could not open admin changelist (is the account staff/superuser?).')
         payload = {
             'csrfmiddlewaretoken': self._csrf(soup),
-            'action': 'make_public_and_update_publish_date',
+            'action': self.PUBLISH_ACTION if make_public else self.UNPUBLISH_ACTION,
             'select_across': '1',
             'index': '0',
             '_selected_action': '0',
@@ -728,6 +732,34 @@ class Uploader:
                            headers={'Referer': self.url(path)},
                            allow_redirects=False, timeout=120)
         return resp.status_code in (200, 301, 302)
+
+    def set_public_codes(self, codes, make_public=True):
+        """Publish/unpublish a SPECIFIC subset of problems (by code)."""
+        pks = []
+        for code in codes:
+            pk = self.admin_problem_pk(code)
+            if pk:
+                pks.append(pk)
+        if not pks:
+            raise RuntimeError('none of the given codes were found in /admin')
+        path = '/admin/judge/problem/'
+        r, soup = self._get_soup(path)
+        payload = [
+            ('csrfmiddlewaretoken', self._csrf(soup)),
+            ('action', self.PUBLISH_ACTION if make_public else self.UNPUBLISH_ACTION),
+            ('select_across', '0'),
+            ('index', '0'),
+        ]
+        for pk in pks:
+            payload.append(('_selected_action', pk))
+        resp = self.s.post(self.url(path), data=payload,
+                           headers={'Referer': self.url(path)},
+                           allow_redirects=False, timeout=120)
+        return resp.status_code in (200, 301, 302), len(pks)
+
+    # backward-compatible alias used by the end-of-run auto-publish
+    def publish_prefix(self, prefix):
+        return self.set_public_prefix(prefix, make_public=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -775,6 +807,12 @@ def main():
                     default='visible',
                     help='Testcase visibility. Default: visible ("Co the xem" / always visible).')
     ap.add_argument('--no-publish', action='store_true', help='Do NOT bulk-publish after import.')
+    ap.add_argument('--publish-only', action='store_true',
+                    help='Do nothing but PUBLISH (make public) the cses_* problems, then exit. '
+                         'Use --only to target a specific subset.')
+    ap.add_argument('--unpublish-only', action='store_true',
+                    help='Do nothing but UNPUBLISH (make private) the cses_* problems, then exit. '
+                         'Use --only to target a specific subset.')
     ap.add_argument('--overwrite', action='store_true', help='Re-upload data for problems that already exist.')
     ap.add_argument('--with-editorial', action='store_true',
                     help='Also upload analysis_<lang>.md as the problem editorial (Solution).')
@@ -833,6 +871,24 @@ def main():
     up.login(opt.user, password)
     print('  OK\n')
 
+    # ---- publish/unpublish-only modes: just flip visibility, then exit ----
+    if opt.publish_only or opt.unpublish_only:
+        make_public = opt.publish_only
+        verb = 'Publishing' if make_public else 'Unpublishing'
+        try:
+            if only:
+                codes = [opt.code_prefix + i for i in sorted(only)]
+                print('%s %d specific problem(s) ...' % (verb, len(codes)))
+                ok, n = up.set_public_codes(codes, make_public)
+                print('  %s (%d problems).' % ('done' if ok else 'FAILED', n))
+            else:
+                print('%s all %s* problems ...' % (verb, opt.code_prefix))
+                ok = up.set_public_prefix(opt.code_prefix, make_public)
+                print('  %s.' % ('done' if ok else 'FAILED'))
+        except Exception as e:
+            print('  FAILED: %s' % e)
+        return
+
     found = created = skipped = failed = 0
     img_cache = {}
     for pid, name, cat, pdir, st, zp in iter_problems(opt.root, opt.lang, only):
@@ -853,10 +909,11 @@ def main():
                 raise RuntimeError('no test cases found in zip')
 
             exists = up.problem_exists(code)
-            # Nothing to do only if the problem exists, we're not refreshing data,
-            # and we're not adding an editorial or a translation.
-            if exists and not opt.overwrite and not opt.with_editorial and not opt.bilingual:
-                print('[%s] %s -> exists, skip (use --overwrite to refresh data)' % (pid, name))
+            # Clean resume: a problem that already exists is skipped entirely
+            # (no re-create, no re-upload, no re-touch). Use --overwrite to
+            # refresh its statement/limits/test data/editorial.
+            if exists and not opt.overwrite:
+                print('[%s] %s -> exists, skip (use --overwrite to refresh)' % (pid, name))
                 skipped += 1
                 continue
 
