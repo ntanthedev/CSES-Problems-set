@@ -595,10 +595,6 @@ class Uploader:
             data['problem-data-checker'] = resolve_strict(
                 checker_opts, *CHECKER_LABELS[mode], field='problem-data-checker (mode=%s, problem=%s)' % (mode, code))
 
-            args = checker_spec.get('checker_args')
-            if args is not None:
-                data['problem-data-checker_args'] = json.dumps(args, ensure_ascii=False)
-
             if mode == 'bridged':
                 ctype = checker_spec.get('checker_type', 'testlib')
                 ctype_opts = select_options(form, 'problem-data-checker_type')
@@ -611,6 +607,25 @@ class Uploader:
                 checker_file_path = os.path.join(pdir, fname)
                 if not os.path.exists(checker_file_path):
                     raise RuntimeError('checker file not found for %s: %s' % (code, checker_file_path))
+                # CONFIRMED BY A REAL FAILED SUBMISSION (Necessary Cities / cses_2077):
+                # picking 'checker_type' on the form is NOT enough on its own - the
+                # judge-server's bridged checker crashes at grading time with
+                #   TypeError: check() missing 1 required positional argument: 'files'
+                # (judge/graders/standard.py -> checker(...)) unless checker_args
+                # ITSELF also carries 'files' (docs.dmoj.ca: files/type/lang/... are
+                # all read from checker_args, not from the uploaded file's name alone).
+                # 'type' wasn't flagged as missing in that traceback, but we set it
+                # explicitly too rather than rely on an unconfirmed auto-merge from
+                # the checker_type dropdown - cheap insurance against the same class
+                # of bug. Anything the manifest put under "checker_args" is layered
+                # on top (e.g. for a checker that also wants custom time_limit/flags).
+                bridged_args = {'files': fname, 'type': ctype}
+                bridged_args.update(checker_spec.get('checker_args') or {})
+                data['problem-data-checker_args'] = json.dumps(bridged_args, ensure_ascii=False)
+            else:
+                args = checker_spec.get('checker_args')
+                if args is not None:
+                    data['problem-data-checker_args'] = json.dumps(args, ensure_ascii=False)
 
         n = len(cases)
         data['cases-TOTAL_FORMS'] = str(n)
@@ -1126,7 +1141,7 @@ def main():
                 continue
 
             body = up.process_images(body, pdir, img_cache)   # upload images, center them
-            source = 'CSES %s' % pid
+            source = 'CSES (https://cses.fi/problemset/task/%s)' % pid
             if not exists:
                 up.create_problem(code, name, body, tl, mem, opt.points, opt.partial,
                                   source, opt.group,
