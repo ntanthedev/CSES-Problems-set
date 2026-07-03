@@ -1,14 +1,23 @@
+/*
+ * Problem:      3213 Water Containers Moves
+ * Input read:   a, b, x (capacities and target volume)
+ * Validity:     -1 iff impossible; else n moves and total moved water m such that
+ *               moves are legal (FILL/EMPTY/MOVE, each moves >=1 unit), container A
+ *               ends with x units
+ * Optimality:   total moved water m compared to ans (minimum)
+ * Complexity:   O(n) simulation
+ */
 #include "testlib.h"
 #include <string>
 #include <vector>
 using namespace std;
 
-int pour_cost(int a, int b, int capA, int capB, char from, char to) {
+static int pour_cost(int a, int b, int capA, int capB, char from, char to) {
     if (from == 'A' && to == 'B') return min(a, capB - b);
     return min(b, capA - a);
 }
 
-int apply_move(int& a, int& b, int capA, int capB, const string& move, int idx) {
+static int apply_move(int& a, int& b, int capA, int capB, const string& move, int idx) {
     if (move == "FILL A") {
         int add = capA - a;
         if (add < 1)
@@ -57,8 +66,8 @@ int apply_move(int& a, int& b, int capA, int capB, const string& move, int idx) 
     return 0;
 }
 
-void skip_moves(int n) {
-    for (int i = 0; i < n; i++) {
+static void skip_moves(int moveCount) {
+    for (int i = 0; i < moveCount; i++) {
         string tok = ans.readToken();
         if (tok == "MOVE") {
             ans.readToken();
@@ -76,27 +85,24 @@ int main(int argc, char* argv[]) {
     int capB = inf.readInt();
     int target = inf.readInt();
 
-    string ref_first = ans.readToken();
-
-    if (ref_first == "-1") {
-        string out_first = ouf.readToken();
-        if (out_first != "-1")
-            quitf(_wa, "Measuring %d units is impossible", target);
+    string ansFirst = ans.readToken();
+    if (ansFirst == "-1") {
+        string tok = ouf.readToken();
+        if (tok != "-1")
+            quitf(_wa, "Measuring %d units is impossible but contestant printed \"%s\"",
+                  target, compress(tok).c_str());
         if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: impossible");
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "correctly reported impossible");
     }
 
-    int ref_n = stoi(ref_first);
-    int optimal_moved = ans.readInt();
-    skip_moves(ref_n);
+    int optimalMoves = stoi(ansFirst);
+    int optimalMoved = ans.readInt();
+    skip_moves(optimalMoves);
 
-    string out_first = ouf.readToken();
-    if (out_first == "-1")
-        quitf(_wa, "Measuring %d units is possible but output is -1", target);
+    int n = ouf.readInt(0, 2000000, "n");
+    int claimed = ouf.readInt(0, 2000000000, "moved water");
 
-    int n = stoi(out_first);
-    int claimed = ouf.readInt();
     int a = 0, b = 0, total = 0;
     for (int i = 0; i < n; i++) {
         string move = ouf.readToken();
@@ -116,10 +122,10 @@ int main(int argc, char* argv[]) {
     if (total != claimed)
         quitf(_wa, "Reported moved water is %d, but moves sum to %d", claimed, total);
 
-    if (total != optimal_moved)
-        quitf(_wa, "Minimum moved water is %d, got %d", optimal_moved, total);
+    if (total != optimalMoved)
+        quitf(_wa, "Minimum moved water is %d, got %d", optimalMoved, total);
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid optimal solution with %d moves and %d moved water", n, total);
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "valid optimal solution with %d moves and %d moved water", n, total);
 }

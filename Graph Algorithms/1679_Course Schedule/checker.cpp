@@ -1,9 +1,17 @@
+/*
+ * HEADER CONTRACT
+ * Problem:      1679 Course Schedule
+ * Input read:   n, m; m requirements (a, b): course a before course b
+ * Validity:     IMPOSSIBLE if no topological order; else permutation of 1..n
+ *               with pos[a] < pos[b] for every requirement
+ * Optimality:   any valid topological order (no scalar from ans)
+ * Complexity:   O(n + m) time, O(n + m) memory
+ */
 #include "testlib.h"
-#include <vector>
-#include <string>
+#include <bits/stdc++.h>
 using namespace std;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     registerTestlibCmd(argc, argv);
 
     int n = inf.readInt();
@@ -16,47 +24,31 @@ int main(int argc, char* argv[]) {
     }
 
     string ansTok = ans.readToken();
-    if (ansTok != "IMPOSSIBLE") {
-        int v = stoi(ansTok);
-        if (v < 1 || v > n)
-            quitf(_fail, "Invalid judge answer token '%s'", ansTok.c_str());
-    }
-
-    string outTok = ouf.readToken();
-    if (outTok == "IMPOSSIBLE") {
-        if (ansTok != "IMPOSSIBLE")
-            quitf(_wa, "Output is IMPOSSIBLE but a valid course order exists");
+    if (ansTok == "IMPOSSIBLE") {
+        string oufTok = ouf.readToken();
+        if (oufTok != "IMPOSSIBLE")
+            quitf(_wa, "jury answer is IMPOSSIBLE but contestant printed \"%s\" "
+                       "(claims a valid course order exists)",
+                  compress(oufTok).c_str());
         if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: no valid course order");
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "correctly reported IMPOSSIBLE");
     }
-
-    if (ansTok == "IMPOSSIBLE")
-        quitf(_wa, "A valid course order exists but output is IMPOSSIBLE");
 
     vector<int> order(n);
-    order[0] = stoi(outTok);
-    if (order[0] < 1 || order[0] > n)
-        quitf(_wa, "Course %d out of range [1,%d]", order[0], n);
-
-    for (int i = 1; i < n; i++) {
-        order[i] = ouf.readInt();
-        if (order[i] < 1 || order[i] > n)
-            quitf(_wa, "Course %d out of range [1,%d]", order[i], n);
-    }
-
+    order[0] = ouf.readInt(1, n, "course[1]");
     for (int i = 1; i < n; i++)
-        ans.readInt();
+        order[i] = ouf.readInt(1, n, format("course[%d]", i + 1).c_str());
 
     vector<bool> seen(n + 1, false);
-    for (int x : order) {
-        if (seen[x])
-            quitf(_wa, "Course %d appears more than once", x);
-        seen[x] = true;
+    for (int i = 0; i < n; i++) {
+        if (seen[order[i]])
+            quitf(_wa, "course %d appears more than once in the order", order[i]);
+        seen[order[i]] = true;
     }
     for (int i = 1; i <= n; i++) {
         if (!seen[i])
-            quitf(_wa, "Course %d is missing from the order", i);
+            quitf(_wa, "course %d is missing from the order", i);
     }
 
     vector<int> pos(n + 1);
@@ -65,10 +57,10 @@ int main(int argc, char* argv[]) {
 
     for (auto [a, b] : requirements) {
         if (pos[a] >= pos[b])
-            quitf(_wa, "Requirement %d before %d violated", a, b);
+            quitf(_wa, "requirement violated: course %d must come before course %d", a, b);
     }
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid topological order of %d courses", n);
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "valid topological order of %d courses", n);
 }

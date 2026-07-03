@@ -1,3 +1,11 @@
+/*
+ * Problem:      3423 Permutation Prime Sums
+ * Input read:   n
+ * Validity:     IMPOSSIBLE iff no pair exists; else two permutations of 1..n with
+ *               a_i + b_i prime for every position i
+ * Optimality:   any valid pair (no scalar from ans)
+ * Complexity:   O(n sqrt n)
+ */
 #include "testlib.h"
 #include <vector>
 #include <string>
@@ -17,42 +25,30 @@ int main(int argc, char* argv[]) {
     registerTestlibCmd(argc, argv);
 
     int n = inf.readInt();
-    string ans_first = ans.readToken();
-    bool ans_impossible = (ans_first == "IMPOSSIBLE");
 
-    string first = ouf.readToken();
-    if (first == "IMPOSSIBLE") {
-        if (!ans_impossible)
-            quitf(_wa, "A solution exists for n=%d but contestant printed IMPOSSIBLE", n);
+    string ansFirst = ans.readToken();
+    if (ansFirst == "IMPOSSIBLE") {
+        string tok = ouf.readToken();
+        if (tok != "IMPOSSIBLE")
+            quitf(_wa, "Jury answer is IMPOSSIBLE but contestant printed \"%s\"",
+                  compress(tok).c_str());
         if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: no solution");
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "correctly reported IMPOSSIBLE");
     }
-
-    if (ans_impossible)
-        quitf(_wa, "No solution exists but contestant printed permutations");
 
     vector<int> a(n), b(n);
     vector<bool> seen_a(n + 1, false), seen_b(n + 1, false);
 
-    a[0] = stoi(first);
-    if (a[0] < 1 || a[0] > n)
-        quitf(_wa, "Value %d out of range [1,%d]", a[0], n);
-    seen_a[a[0]] = true;
-
-    for (int i = 1; i < n; i++) {
-        a[i] = ouf.readInt();
-        if (a[i] < 1 || a[i] > n)
-            quitf(_wa, "Value %d out of range [1,%d]", a[i], n);
+    for (int i = 0; i < n; i++) {
+        a[i] = ouf.readInt(1, n, format("a[%d]", i + 1).c_str());
         if (seen_a[a[i]])
             quitf(_wa, "Value %d appears more than once in first permutation", a[i]);
         seen_a[a[i]] = true;
     }
 
     for (int i = 0; i < n; i++) {
-        b[i] = ouf.readInt();
-        if (b[i] < 1 || b[i] > n)
-            quitf(_wa, "Value %d out of range [1,%d]", b[i], n);
+        b[i] = ouf.readInt(1, n, format("b[%d]", i + 1).c_str());
         if (seen_b[b[i]])
             quitf(_wa, "Value %d appears more than once in second permutation", b[i]);
         seen_b[b[i]] = true;
@@ -66,6 +62,6 @@ int main(int argc, char* argv[]) {
     }
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid prime-sum permutations");
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "valid prime-sum permutations");
 }

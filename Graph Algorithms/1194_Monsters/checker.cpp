@@ -1,3 +1,12 @@
+/*
+ * Problem:      1194 Monsters
+ * Input read:   n, m; n grid rows (each m chars: . # A M)
+ * Validity:     YES/NO matches possibility; if YES: path length <= n*m, steps are
+ *               D/U/L/R on walkable cells, never shares square with monster at
+ *               same time, ends on boundary
+ * Optimality:   any valid path (no scalar from ans)
+ * Complexity:   O(n*m) BFS + O(path length)
+ */
 #include "testlib.h"
 #include <vector>
 #include <string>
@@ -12,23 +21,30 @@ int main(int argc, char* argv[]) {
     int n = inf.readInt();
     int m = inf.readInt();
     vector<string> grid(n);
-    pair<int, int> start;
-    vector<pair<int, int>> monsters;
+    pair<int, int> start{-1, -1};
     for (int i = 0; i < n; i++) {
-        grid[i] = inf.readLine();
+        grid[i] = inf.readToken();
+        if ((int)grid[i].size() != m)
+            quitf(_fail, "Grid row %d has length %d, expected %d", i + 1, (int)grid[i].size(), m);
         for (int j = 0; j < m; j++) {
-            if (grid[i][j] == 'A') start = {i, j};
-            if (grid[i][j] == 'M') monsters.push_back({i, j});
+            if (grid[i][j] == 'A')
+                start = {i, j};
         }
     }
+    if (start.first == -1)
+        quitf(_fail, "No starting position A in input");
 
     int dr[] = {0, 1, 0, -1};
     int dc[] = {1, 0, -1, 0};
     vector<vector<int>> mdist(n, vector<int>(m, INF));
     queue<pair<int, int>> q;
-    for (auto [r, c] : monsters) {
-        mdist[r][c] = 0;
-        q.push({r, c});
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            if (grid[i][j] == 'M') {
+                mdist[i][j] = 0;
+                q.push({i, j});
+            }
+        }
     }
     while (!q.empty()) {
         auto [r, c] = q.front();
@@ -53,25 +69,22 @@ int main(int argc, char* argv[]) {
 
     if (outFlag == "NO") {
         if (ansFlag != "NO")
-            quitf(_wa, "Output is NO but escape is possible");
+            quitf(_wa, "Contestant printed NO but escape is possible");
         if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: no escape");
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "correctly reported no escape");
     }
 
     if (ansFlag == "NO")
-        quitf(_wa, "Escape is possible but output is NO");
+        quitf(_wa, "Contestant printed YES but escape is impossible");
 
-    if (ansFlag == "YES")
-        ans.readInt(), ans.readToken();
-
-    int len = ouf.readInt();
-    string path = ouf.readToken();
-
+    int maxLen = n * m;
+    int len = ouf.readInt(0, maxLen, "path length");
+    string path;
+    if (len > 0)
+        path = ouf.readToken();
     if ((int)path.size() != len)
         quitf(_wa, "Path length %d does not match string length %d", len, (int)path.size());
-    if (len > n * m)
-        quitf(_wa, "Path length %d exceeds maximum %d", len, n * m);
 
     int r = start.first, c = start.second;
     for (int step = 0; step < len; step++) {
@@ -98,6 +111,6 @@ int main(int argc, char* argv[]) {
         quitf(_wa, "Path ends at (%d,%d), not on boundary", r + 1, c + 1);
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid escape path of length %d", len);
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "valid escape path of length %d", len);
 }

@@ -1,7 +1,17 @@
+/*
+ * Problem:      1197 Cycle Finding
+ * Input read:   n, m; m directed edges (a, b, c)
+ * Validity:     YES/NO matches existence; if YES: vertex sequence forms a directed
+ *               cycle (repeated vertex, first equals last), each arc exists in the
+ *               multigraph, total edge weight along cycle is negative
+ * Optimality:   any valid negative cycle (no scalar from ans)
+ * Complexity:   O(m + cycle length)
+ */
 #include "testlib.h"
 #include <vector>
 #include <string>
-#include <tuple>
+#include <map>
+#include <utility>
 using namespace std;
 using ll = long long;
 
@@ -10,38 +20,35 @@ int main(int argc, char* argv[]) {
 
     int n = inf.readInt();
     int m = inf.readInt();
-    vector<tuple<int, int, ll>> edges;
+    map<pair<int, int>, vector<ll>> edges;
     for (int i = 0; i < m; i++) {
         int a = inf.readInt();
         int b = inf.readInt();
         ll c = inf.readLong();
-        edges.push_back({a, b, c});
+        edges[{a, b}].push_back(c);
     }
 
-    string ans_token = ans.readToken();
-    bool ans_yes = (ans_token == "YES");
+    string ansToken = ans.readToken();
+    if (ansToken != "YES" && ansToken != "NO")
+        quitf(_fail, "Invalid judge answer token '%s'", ansToken.c_str());
 
-    string out_token = ouf.readToken();
-    if (out_token == "NO") {
-        if (ans_yes)
-            quitf(_wa, "Negative cycle exists but contestant printed NO");
+    string outToken = ouf.readToken();
+    if (outToken == "NO") {
+        if (ansToken != "NO")
+            quitf(_wa, "Contestant printed NO but a negative cycle exists");
         if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: no negative cycle");
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "correctly reported no negative cycle");
     }
 
-    if (out_token != "YES")
-        quitf(_wa, "Expected YES or NO, got '%s'", out_token.c_str());
-    if (!ans_yes)
-        quitf(_wa, "No negative cycle exists but contestant printed YES");
+    if (outToken != "YES")
+        quitf(_wa, "Expected YES or NO, got '%s'", outToken.c_str());
+    if (ansToken == "NO")
+        quitf(_wa, "Contestant printed YES but no negative cycle exists");
 
     vector<int> cycle;
-    while (!ouf.readEof()) {
-        int x = ouf.readInt();
-        if (x < 1 || x > n)
-            quitf(_wa, "Vertex %d out of range", x);
-        cycle.push_back(x);
-    }
+    while (!ouf.seekEof())
+        cycle.push_back(ouf.readInt(1, n, "vertex"));
 
     if ((int)cycle.size() < 2)
         quitf(_wa, "Cycle must have at least 2 vertices");
@@ -57,7 +64,7 @@ int main(int argc, char* argv[]) {
         firstOccurrence[v] = i;
     }
     if (cycleStart == -1)
-        quitf(_wa, "Cycle must repeat a vertex (no vertex appears twice)");
+        quitf(_wa, "Cycle must repeat a vertex");
     if (cycle[cycleStart] != cycle.back())
         quitf(_wa, "First and last vertices of cycle must match");
 
@@ -68,22 +75,17 @@ int main(int argc, char* argv[]) {
     ll totalWeight = 0;
     for (int i = 0; i + 1 < (int)actualCycle.size(); i++) {
         int u = actualCycle[i], v = actualCycle[i + 1];
-        bool found = false;
-        ll w = 0;
-        for (auto [a, b, c] : edges) {
-            if (a == u && b == v) {
-                found = true;
-                w = c;
-                break;
-            }
-        }
-        if (!found)
+        auto it = edges.find({u, v});
+        if (it == edges.end())
             quitf(_wa, "No edge from %d to %d in the cycle", u, v);
-        totalWeight += w;
+        ll best = it->second[0];
+        for (ll w : it->second)
+            best = min(best, w);
+        totalWeight += best;
     }
 
     if (totalWeight >= 0)
         quitf(_wa, "Sum of edge weights in cycle is %lld, not negative", totalWeight);
 
-    quitf(_ok, "Valid negative cycle with total weight %lld", totalWeight);
+    quitf(_ok, "valid negative cycle with total weight %lld", totalWeight);
 }

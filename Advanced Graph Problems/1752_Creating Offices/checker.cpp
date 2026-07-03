@@ -1,11 +1,17 @@
+/*
+ * HEADER CONTRACT
+ * Problem:      1752 Creating Offices
+ * Input read:   n, d; n-1 tree edges (a,b)
+ * Validity:     print k then k distinct cities in [1,n]; every pair of chosen cities
+ *               has tree distance at least d.
+ * Optimality:   k must equal ans.readInt() (maximum office count)
+ * Complexity:   O(n) time and memory — one multi-source BFS, no O(k^2) pairwise LCA
+ */
 #include "testlib.h"
-#include <vector>
-#include <array>
+#include <bits/stdc++.h>
 using namespace std;
 
-static const int LOGN = 19;
-
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     registerTestlibCmd(argc, argv);
 
     int n = inf.readInt();
@@ -18,71 +24,57 @@ int main(int argc, char* argv[]) {
         g[b].push_back(a);
     }
 
-    int k_ans = ans.readInt();
-    int k = ouf.readInt();
-    if (k != k_ans)
-        quitf(_wa, "Claimed %d offices but optimal is %d", k, k_ans);
-    if (k < 0 || k > n)
-        quitf(_wa, "k=%d out of range [0,%d]", k, n);
+    int kAns = ans.readInt();
+    int k = ouf.readInt(0, n, "k");
+    if (k != kAns)
+        quitf(_wa, "contestant printed k = %d but optimal is %d", k, kAns);
 
     vector<int> offices(k);
-    vector<bool> is_office(n + 1, false);
+    vector<char> isOffice(n + 1, 0);
     for (int i = 0; i < k; i++) {
-        offices[i] = ouf.readInt();
-        if (offices[i] < 1 || offices[i] > n)
-            quitf(_wa, "City %d out of range", offices[i]);
-        if (is_office[offices[i]])
-            quitf(_wa, "City %d selected more than once", offices[i]);
-        is_office[offices[i]] = true;
+        offices[i] = ouf.readInt(1, n, format("office[%d]", i + 1).c_str());
+        if (isOffice[offices[i]])
+            quitf(_wa, "city %d selected more than once", offices[i]);
+        isOffice[offices[i]] = 1;
     }
 
-    vector<array<int, LOGN>> up(n + 1);
-    vector<int> depth(n + 1), tin(n + 1), tout(n + 1);
-    int timer = 0;
+    if (k <= 1) {
+        if (!ouf.seekEof())
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "valid maximum office placement with %d offices", k);
+    }
 
-    auto is_ancestor = [&](int u, int v) {
-        return tin[u] <= tin[v] && tout[u] >= tout[v];
-    };
-
-    function<int(int, int)> lca = [&](int u, int v) {
-        if (is_ancestor(u, v))
-            return u;
-        if (is_ancestor(v, u))
-            return v;
-        int x = u;
-        for (int i = LOGN - 1; i >= 0; i--)
-            if (!is_ancestor(up[x][i], v))
-                x = up[x][i];
-        return up[x][0];
-    };
-
-    auto dist = [&](int u, int v) {
-        return depth[u] + depth[v] - 2 * depth[lca(u, v)];
-    };
-
-    function<void(int, int)> dfs = [&](int u, int par) {
-        tin[u] = ++timer;
-        depth[u] = depth[par] + 1;
-        up[u][0] = par;
-        for (int i = 1; i < LOGN; i++)
-            up[u][i] = up[up[u][i - 1]][i - 1];
-        for (int v : g[u])
-            if (v != par)
-                dfs(v, u);
-        tout[u] = ++timer;
-    };
-    dfs(1, 1);
-
+    const int INF = 1e9;
+    vector<int> dist(n + 1, INF), source(n + 1, -1);
+    queue<int> q;
     for (int i = 0; i < k; i++) {
-        for (int j = i + 1; j < k; j++) {
-            int dd = dist(offices[i], offices[j]);
-            if (dd < d)
-                quitf(_wa, "Distance between offices %d and %d is %d, need at least %d",
-                      offices[i], offices[j], dd, d);
+        int o = offices[i];
+        dist[o] = 0;
+        source[o] = o;
+        q.push(o);
+    }
+
+    while (!q.empty()) {
+        int u = q.front();
+        q.pop();
+        for (int v : g[u]) {
+            if (dist[v] != INF) {
+                if (source[v] != source[u]) {
+                    int sep = dist[v] + dist[u] + 1;
+                    if (sep < d)
+                        quitf(_wa,
+                              "distance between offices %d and %d is %d, need at least %d",
+                              source[v], source[u], sep, d);
+                }
+                continue;
+            }
+            dist[v] = dist[u] + 1;
+            source[v] = source[u];
+            q.push(v);
         }
     }
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid maximum office placement with %d offices", k);
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "valid maximum office placement with %d offices", k);
 }

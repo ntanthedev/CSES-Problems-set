@@ -1,76 +1,86 @@
+/*
+ * HEADER CONTRACT
+ * Problem:      1691 Mail Delivery
+ * Input read:   n, m; m undirected streets (a, b), post office at crossing 1
+ * Validity:     IMPOSSIBLE if no Eulerian circuit at 1; else m+1 crossings in [1,n],
+ *               route[0]=route[m]=1, each input street used exactly once
+ * Optimality:   any valid Eulerian circuit (no scalar from ans)
+ * Complexity:   O(n + m log m) time, O(n + m) memory
+ */
 #include "testlib.h"
-#include <vector>
-#include <string>
-#include <set>
+#include <bits/stdc++.h>
 using namespace std;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     registerTestlibCmd(argc, argv);
 
     int n = inf.readInt();
     int m = inf.readInt();
-    vector<set<int>> g(n + 1);
-    vector<pair<int, int>> edges;
+    multiset<pair<int, int>> streets;
     for (int i = 0; i < m; i++) {
         int a = inf.readInt();
         int b = inf.readInt();
-        g[a].insert(b);
-        g[b].insert(a);
-        edges.push_back({a, b});
+        int u = min(a, b), v = max(a, b);
+        streets.insert({u, v});
     }
 
-    string ansFirst = ans.readToken();
-    string outFirst = ouf.readToken();
-
-    if (outFirst == "IMPOSSIBLE") {
-        if (ansFirst != "IMPOSSIBLE")
-            quitf(_wa, "Output is IMPOSSIBLE but an Eulerian circuit exists");
+    string ansTok = ans.readToken();
+    if (ansTok == "IMPOSSIBLE") {
+        string oufTok = ouf.readToken();
+        if (oufTok != "IMPOSSIBLE")
+            quitf(_wa, "jury answer is IMPOSSIBLE but contestant printed \"%s\" "
+                       "(claims an Eulerian circuit exists)",
+                  compress(oufTok).c_str());
         if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: no Eulerian circuit");
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "correctly reported IMPOSSIBLE");
     }
 
-    if (ansFirst == "IMPOSSIBLE")
-        quitf(_wa, "An Eulerian circuit exists but output is IMPOSSIBLE");
+    string oufFirst = ouf.readToken();
+    if (oufFirst == "IMPOSSIBLE")
+        quitf(_wa, "jury has a valid Eulerian circuit but contestant printed IMPOSSIBLE");
 
-    int start = stoi(outFirst);
-    if (start < 1 || start > n)
-        quitf(_wa, "Start crossing %d out of range", start);
+    auto readVertex = [&](const string &t, const char *name) -> int {
+        if (t.empty())
+            quitf(_wa, "%s is empty", name);
+        long long v = 0;
+        for (char c : t) {
+            if (c < '0' || c > '9')
+                quitf(_wa, "%s must be an integer in [1,%d], got \"%s\"", name, n, compress(t).c_str());
+            v = v * 10 + (c - '0');
+            if (v > n)
+                quitf(_wa, "%s = %lld is out of range [1,%d]", name, v, n);
+        }
+        if (v < 1)
+            quitf(_wa, "%s = %lld is out of range [1,%d]", name, v, n);
+        return (int)v;
+    };
 
-    vector<int> route;
-    route.push_back(start);
-    for (int i = 1; i <= m; i++)
-        route.push_back(ouf.readInt(1, n));
-
-    if ((int)route.size() != m + 1)
-        quitf(_wa, "Route has %d crossings, expected %d", (int)route.size(), m + 1);
+    int routeLen = m + 1;
+    vector<int> route(routeLen);
+    route[0] = readVertex(oufFirst, "route[1]");
+    for (int i = 1; i < routeLen; i++)
+        route[i] = ouf.readInt(1, n, format("route[%d]", i + 1).c_str());
 
     if (route[0] != 1)
-        quitf(_wa, "Route must start at crossing 1, got %d", route[0]);
+        quitf(_wa, "route must start at crossing 1, contestant starts at %d", route[0]);
     if (route[m] != 1)
-        quitf(_wa, "Route must end at crossing 1, got %d", route[m]);
+        quitf(_wa, "route must end at crossing 1, contestant ends at %d", route[m]);
 
-    vector<set<int>> used(n + 1);
+    multiset<pair<int, int>> remaining = streets;
     for (int i = 0; i < m; i++) {
         int u = route[i], v = route[i + 1];
-        if (!g[u].count(v))
-            quitf(_wa, "No street between %d and %d in route", u, v);
         int a = min(u, v), b = max(u, v);
-        if (used[a].count(b))
-            quitf(_wa, "Street %d-%d used more than once", a, b);
-        used[a].insert(b);
+        auto it = remaining.find({a, b});
+        if (it == remaining.end())
+            quitf(_wa, "street %d-%d on step %d does not exist or was already used", u, v, i + 1);
+        remaining.erase(it);
     }
 
-    for (auto [a, b] : edges) {
-        int mn = min(a, b), mx = max(a, b);
-        if (!used[mn].count(mx))
-            quitf(_wa, "Street %d-%d not visited", a, b);
-    }
-
-    for (int i = 0; i < m; i++)
-        ans.readInt();
+    if (!remaining.empty())
+        quitf(_wa, "contestant route does not use all %d streets", m);
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid Eulerian circuit with %d edges", m);
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "valid Eulerian circuit with %d streets", m);
 }

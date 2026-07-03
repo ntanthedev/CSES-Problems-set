@@ -1,6 +1,6 @@
 #include <iostream>
-#include <vector>
 #include <stack>
+#include <vector>
 using namespace std;
 
 static bool simulate(const vector<int>& input, const vector<int>& assignment) {
@@ -35,6 +35,23 @@ static bool simulate(const vector<int>& input, const vector<int>& assignment) {
     return true;
 }
 
+static int drainCount(stack<int> s1, stack<int> s2, int next_out) {
+    while (true) {
+        if (!s1.empty() && s1.top() == next_out) {
+            s1.pop();
+            next_out++;
+            continue;
+        }
+        if (!s2.empty() && s2.top() == next_out) {
+            s2.pop();
+            next_out++;
+            continue;
+        }
+        break;
+    }
+    return next_out;
+}
+
 static bool build(int pos, const vector<int>& input, vector<int>& assignment) {
     int n = (int)input.size();
     if (pos == n) return simulate(input, assignment);
@@ -45,6 +62,62 @@ static bool build(int pos, const vector<int>& input, vector<int>& assignment) {
     return false;
 }
 
+static bool greedy(const vector<int>& input, vector<int>& assignment) {
+    stack<int> s1, s2;
+    int next_out = 1;
+
+    auto drain = [&]() {
+        while (true) {
+            if (!s1.empty() && s1.top() == next_out) {
+                s1.pop();
+                next_out++;
+                continue;
+            }
+            if (!s2.empty() && s2.top() == next_out) {
+                s2.pop();
+                next_out++;
+                continue;
+            }
+            break;
+        }
+    };
+
+    for (int i = 0; i < (int)input.size(); i++) {
+        int val = input[i];
+        bool ok1 = s1.empty() || val < s1.top();
+        bool ok2 = s2.empty() || val < s2.top();
+
+        if (!ok1 && !ok2) return false;
+
+        if (ok1 && ok2) {
+            stack<int> t1 = s1, t2 = s2;
+            t1.push(val);
+            int d1 = drainCount(t1, t2, next_out);
+            t1 = s1;
+            t2 = s2;
+            t2.push(val);
+            int d2 = drainCount(t1, t2, next_out);
+            if (d1 >= d2) {
+                assignment[i] = 1;
+                s1.push(val);
+            } else {
+                assignment[i] = 2;
+                s2.push(val);
+            }
+        } else if (ok1) {
+            assignment[i] = 1;
+            s1.push(val);
+        } else {
+            assignment[i] = 2;
+            s2.push(val);
+        }
+        drain();
+    }
+
+    drain();
+    return next_out == (int)input.size() + 1;
+}
+
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
@@ -52,17 +125,22 @@ int main() {
     int n;
     cin >> n;
     vector<int> input(n);
-    for (int i = 0; i < n; i++) cin >> input[i];
+    for (int i = 0; i < n; i++)
+        cin >> input[i];
 
     vector<int> assignment(n);
-    if (!build(0, input, assignment)) {
+    bool ok = n <= 20 ? build(0, input, assignment) : greedy(input, assignment);
+
+    if (!ok) {
         cout << "IMPOSSIBLE\n";
         return 0;
     }
 
     for (int i = 0; i < n; i++) {
-        if (i) cout << ' ';
+        if (i)
+            cout << ' ';
         cout << assignment[i];
     }
     cout << '\n';
+    return 0;
 }

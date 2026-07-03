@@ -1,9 +1,34 @@
+/*
+ * HEADER CONTRACT
+ * Problem:      2215 Monotone Subsequences
+ * Input read:   t test cases; each has n, k
+ * Validity:     per test: IMPOSSIBLE iff no permutation exists; else print a permutation
+ *               of 1..n whose longest monotone subsequence (increasing or decreasing)
+ *               has length exactly k.
+ * Optimality:   none (any valid permutation accepted)
+ * Complexity:   O(t * n log n) time, O(n) memory — n <= 100 per test
+ */
 #include "testlib.h"
-#include <algorithm>
-#include <vector>
+#include <bits/stdc++.h>
 using namespace std;
 
-static int lis_len(const vector<int>& a) {
+static int parseBoundedToken(const string &s, int lo, int hi, const char *name) {
+    if (s.empty())
+        quitf(_pe, "expected %s, got empty token", name);
+    long long v = 0;
+    for (char c : s) {
+        if (!isdigit((unsigned char)c))
+            quitf(_pe, "expected integer %s, got \"%s\"", name, compress(s).c_str());
+        v = v * 10 + (c - '0');
+        if (v > hi)
+            quitf(_wa, "%s = %s out of range [%d,%d]", name, s.c_str(), lo, hi);
+    }
+    if (v < lo)
+        quitf(_wa, "%s = %s out of range [%d,%d]", name, s.c_str(), lo, hi);
+    return (int)v;
+}
+
+static int lisLen(const vector<int> &a) {
     vector<int> dp;
     for (int x : a) {
         auto it = lower_bound(dp.begin(), dp.end(), x);
@@ -15,73 +40,68 @@ static int lis_len(const vector<int>& a) {
     return (int)dp.size();
 }
 
-static int lds_len(const vector<int>& a) {
+static int ldsLen(const vector<int> &a) {
     vector<int> dp;
     for (int x : a) {
-        x = -x;
-        auto it = lower_bound(dp.begin(), dp.end(), x);
+        int y = -x;
+        auto it = lower_bound(dp.begin(), dp.end(), y);
         if (it == dp.end())
-            dp.push_back(x);
+            dp.push_back(y);
         else
-            *it = x;
+            *it = y;
     }
     return (int)dp.size();
 }
 
-static void consume_permutation(int n, InStream& stream) {
+static void consumePermutation(int n, InStream &stream) {
     for (int i = 1; i < n; i++)
         stream.readInt();
 }
 
-static vector<int> read_permutation(int n, const string& first) {
-    vector<int> p(n);
-    vector<bool> seen(n + 1, false);
-    p[0] = stoi(first);
-    if (p[0] < 1 || p[0] > n)
-        quitf(_wa, "Value %d out of range [1,%d]", p[0], n);
-    seen[p[0]] = true;
-
-    for (int i = 1; i < n; i++) {
-        p[i] = ouf.readInt();
-        if (p[i] < 1 || p[i] > n)
-            quitf(_wa, "Value %d out of range [1,%d]", p[i], n);
-        if (seen[p[i]])
-            quitf(_wa, "Value %d appears more than once", p[i]);
-        seen[p[i]] = true;
-    }
-    return p;
-}
-
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     registerTestlibCmd(argc, argv);
 
     int t = inf.readInt();
-    for (int test = 0; test < t; test++) {
+    for (int tc = 1; tc <= t; tc++) {
         int n = inf.readInt();
         int k = inf.readInt();
-        string ans_first = ans.readToken();
-        string ouf_first = ouf.readToken();
 
-        if (ans_first == "IMPOSSIBLE") {
-            if (ouf_first != "IMPOSSIBLE")
-                quitf(_wa, "Test %d: a valid permutation exists but contestant printed IMPOSSIBLE", test + 1);
+        string ansTok = ans.readToken();
+        if (ansTok == "IMPOSSIBLE") {
+            string oufTok = ouf.readToken();
+            if (oufTok != "IMPOSSIBLE")
+                quitf(_wa, "test %d: jury answer is IMPOSSIBLE but contestant printed \"%s\"",
+                      tc, compress(oufTok).c_str());
             continue;
         }
 
-        if (ouf_first == "IMPOSSIBLE")
-            quitf(_wa, "Test %d: no valid permutation exists but contestant printed a solution", test + 1);
+        string oufTok = ouf.readToken();
+        if (oufTok == "IMPOSSIBLE")
+            quitf(_wa, "test %d: a valid permutation exists but contestant printed IMPOSSIBLE", tc);
 
-        consume_permutation(n, ans);
-        vector<int> p = read_permutation(n, ouf_first);
+        consumePermutation(n, ans);
 
-        int longest = max(lis_len(p), lds_len(p));
+        vector<int> p(n);
+        vector<char> seen(n + 1, 0);
+        p[0] = parseBoundedToken(oufTok, 1, n, format("test %d p[1]", tc).c_str());
+        seen[p[0]] = 1;
+        for (int i = 1; i < n; i++) {
+            p[i] = ouf.readInt(1, n, format("test %d p[%d]", tc, i + 1).c_str());
+            if (seen[p[i]])
+                quitf(_wa, "test %d: value %d appears more than once", tc, p[i]);
+            seen[p[i]] = 1;
+        }
+
+        int lis = lisLen(p);
+        int lds = ldsLen(p);
+        int longest = max(lis, lds);
         if (longest != k)
             quitf(_wa,
-                  "Test %d: longest monotone subsequence is %d, expected %d (LIS=%d, LDS=%d)",
-                  test + 1, longest, k, lis_len(p), lds_len(p));
+                  "test %d: longest monotone subsequence is %d, expected %d (LIS=%d, LDS=%d)",
+                  tc, longest, k, lis, lds);
     }
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "All %d tests passed", t);
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "all %d tests passed", t);
 }

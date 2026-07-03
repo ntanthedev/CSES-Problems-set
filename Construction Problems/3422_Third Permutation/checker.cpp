@@ -1,3 +1,11 @@
+/*
+ * Problem:      3422 Third Permutation
+ * Input read:   n; permutations a[1..n], b[1..n]
+ * Validity:     IMPOSSIBLE iff no permutation c exists; else c is a permutation of
+ *               1..n with c_i != a_i and c_i != b_i for all i
+ * Optimality:   any valid permutation (no scalar from ans)
+ * Complexity:   O(n)
+ */
 #include "testlib.h"
 #include <vector>
 #include <string>
@@ -12,32 +20,22 @@ int main(int argc, char* argv[]) {
         a[i] = inf.readInt();
     for (int i = 0; i < n; i++)
         b[i] = inf.readInt();
-    string ans_first = ans.readToken();
-    bool ans_impossible = (ans_first == "IMPOSSIBLE");
 
-    string first = ouf.readToken();
-    if (first == "IMPOSSIBLE") {
-        if (!ans_impossible)
-            quitf(_wa, "A valid third permutation exists but contestant printed IMPOSSIBLE");
+    string ansFirst = ans.readToken();
+    if (ansFirst == "IMPOSSIBLE") {
+        string tok = ouf.readToken();
+        if (tok != "IMPOSSIBLE")
+            quitf(_wa, "Jury answer is IMPOSSIBLE but contestant printed \"%s\"",
+                  compress(tok).c_str());
         if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: no valid third permutation");
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "correctly reported IMPOSSIBLE");
     }
-
-    if (ans_impossible)
-        quitf(_wa, "No valid third permutation exists but contestant printed one");
 
     vector<int> c(n);
     vector<bool> seen(n + 1, false);
-    c[0] = stoi(first);
-    if (c[0] < 1 || c[0] > n)
-        quitf(_wa, "Value %d out of range [1,%d]", c[0], n);
-    seen[c[0]] = true;
-
-    for (int i = 1; i < n; i++) {
-        c[i] = ouf.readInt();
-        if (c[i] < 1 || c[i] > n)
-            quitf(_wa, "Value %d out of range [1,%d]", c[i], n);
+    for (int i = 0; i < n; i++) {
+        c[i] = ouf.readInt(1, n, format("c[%d]", i + 1).c_str());
         if (seen[c[i]])
             quitf(_wa, "Value %d appears more than once", c[i]);
         seen[c[i]] = true;
@@ -51,6 +49,6 @@ int main(int argc, char* argv[]) {
     }
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid third permutation");
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "valid third permutation");
 }

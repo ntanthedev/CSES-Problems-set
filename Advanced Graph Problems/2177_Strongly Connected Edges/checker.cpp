@@ -1,11 +1,40 @@
+/*
+ * HEADER CONTRACT
+ * Problem:      2177 Strongly Connected Edges
+ * Input read:   n, m; m undirected simple edges (a,b)
+ * Validity:     IMPOSSIBLE iff no orientation exists; else orient each input edge exactly
+ *               once (a->b) with 1<=a,b<=n, and the directed graph is strongly connected.
+ * Optimality:   none (any valid orientation accepted)
+ * Complexity:   O(n + m) time and memory — edge multiset + two reachability BFS passes
+ */
 #include "testlib.h"
-#include <vector>
-#include <string>
-#include <map>
-#include <queue>
+#include <bits/stdc++.h>
 using namespace std;
 
-int main(int argc, char* argv[]) {
+static int parseBoundedToken(const string &s, int lo, int hi, const char *name) {
+    if (s.empty())
+        quitf(_pe, "expected %s, got empty token", name);
+    long long v = 0;
+    for (char c : s) {
+        if (!isdigit((unsigned char)c))
+            quitf(_pe, "expected integer %s, got \"%s\"", name, compress(s).c_str());
+        v = v * 10 + (c - '0');
+        if (v > hi)
+            quitf(_wa, "%s = %s out of range [%d,%d]", name, s.c_str(), lo, hi);
+    }
+    if (v < lo)
+        quitf(_wa, "%s = %s out of range [%d,%d]", name, s.c_str(), lo, hi);
+    return (int)v;
+}
+
+static void consumeAnsEdges(int m, const string &firstA) {
+    (void)stoi(firstA);
+    ans.readInt();
+    for (int i = 1; i < m; i++)
+        ans.readInt(), ans.readInt();
+}
+
+int main(int argc, char *argv[]) {
     registerTestlibCmd(argc, argv);
 
     int n = inf.readInt();
@@ -19,84 +48,75 @@ int main(int argc, char* argv[]) {
     }
 
     string ansTok = ans.readToken();
-    string outTok = ouf.readToken();
-
-    if (outTok == "IMPOSSIBLE") {
-        if (ansTok != "IMPOSSIBLE")
-            quitf(_wa, "Output is IMPOSSIBLE but a valid orientation exists");
+    if (ansTok == "IMPOSSIBLE") {
+        string oufTok = ouf.readToken();
+        if (oufTok != "IMPOSSIBLE")
+            quitf(_wa, "jury answer is IMPOSSIBLE but contestant printed \"%s\" "
+                       "(claims a solution exists)",
+                  compress(oufTok).c_str());
         if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: impossible to orient");
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "correctly reported IMPOSSIBLE");
     }
 
-    if (ansTok == "IMPOSSIBLE")
-        quitf(_wa, "A valid orientation exists but output is IMPOSSIBLE");
+    string oufTok = ouf.readToken();
+    if (oufTok == "IMPOSSIBLE")
+        quitf(_wa, "a valid orientation exists but contestant printed IMPOSSIBLE");
 
-    vector<vector<int>> dg(n + 1), rdg(n + 1);
     map<pair<int, int>, int> used = edgeCnt;
+    vector<vector<int>> dg(n + 1), rdg(n + 1);
 
-    auto add_edge = [&](int a, int b) {
-        if (a < 1 || a > n || b < 1 || b > n)
-            quitf(_wa, "Node %d or %d out of range [1,%d]", a, b, n);
+    auto orient = [&](int a, int b, int idx) {
         pair<int, int> key = {min(a, b), max(a, b)};
-        if (!used.count(key) || used[key] == 0)
-            quitf(_wa, "Edge %d %d not in original graph", a, b);
-        used[key]--;
+        auto it = used.find(key);
+        if (it == used.end() || it->second == 0)
+            quitf(_wa, "edge %d: (%d,%d) is not an undirected input edge", idx, a, b);
+        it->second--;
         dg[a].push_back(b);
         rdg[b].push_back(a);
     };
 
-    int a = stoi(outTok);
-    int b = ouf.readInt();
-    add_edge(a, b);
-    for (int i = 1; i < m; i++) {
-        int x = ouf.readInt();
-        int y = ouf.readInt();
-        add_edge(x, y);
+    int a = parseBoundedToken(oufTok, 1, n, "edge 1 endpoint a");
+    int b = ouf.readInt(1, n, "edge 1 endpoint b");
+    orient(a, b, 1);
+    for (int i = 2; i <= m; i++) {
+        int x = ouf.readInt(1, n, format("edge %d endpoint a", i).c_str());
+        int y = ouf.readInt(1, n, format("edge %d endpoint b", i).c_str());
+        orient(x, y, i);
+    }
+    consumeAnsEdges(m, ansTok);
+
+    for (const auto &kv : used) {
+        if (kv.second != 0)
+            quitf(_wa, "not every input edge was oriented exactly once");
     }
 
-    for (auto [key, cnt] : used) {
-        if (cnt != 0)
-            quitf(_wa, "Not all original edges are oriented");
-    }
-
-    ans.readInt();
-    for (int i = 1; i < m; i++)
-        ans.readInt(), ans.readInt();
-
-    vector<char> vis1(n + 1, 0), vis2(n + 1, 0);
-    queue<int> q;
-    q.push(1);
-    vis1[1] = 1;
-    while (!q.empty()) {
-        int u = q.front();
-        q.pop();
-        for (int v : dg[u]) {
-            if (!vis1[v]) {
-                vis1[v] = 1;
-                q.push(v);
+    auto reachable = [&](const vector<vector<int>> &adj) {
+        vector<char> vis(n + 1, 0);
+        queue<int> q;
+        q.push(1);
+        vis[1] = 1;
+        while (!q.empty()) {
+            int u = q.front();
+            q.pop();
+            for (int v : adj[u]) {
+                if (!vis[v]) {
+                    vis[v] = 1;
+                    q.push(v);
+                }
             }
         }
-    }
-    q = queue<int>();
-    q.push(1);
-    vis2[1] = 1;
-    while (!q.empty()) {
-        int u = q.front();
-        q.pop();
-        for (int v : rdg[u]) {
-            if (!vis2[v]) {
-                vis2[v] = 1;
-                q.push(v);
-            }
-        }
-    }
+        return vis;
+    };
+
+    vector<char> fwd = reachable(dg);
+    vector<char> rev = reachable(rdg);
     for (int i = 1; i <= n; i++) {
-        if (!vis1[i] || !vis2[i])
-            quitf(_wa, "Directed graph is not strongly connected");
+        if (!fwd[i] || !rev[i])
+            quitf(_wa, "directed graph is not strongly connected (node %d unreachable)", i);
     }
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid strongly connected orientation");
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "valid strongly connected orientation");
 }

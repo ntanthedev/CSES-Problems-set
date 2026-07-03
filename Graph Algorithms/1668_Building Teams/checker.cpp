@@ -1,56 +1,51 @@
+/*
+ * HEADER CONTRACT
+ * Problem:      1668 Building Teams
+ * Input read:   n, m; m undirected friendships (a, b)
+ * Validity:     IMPOSSIBLE if not 2-colorable; else n team labels in {1,2},
+ *               no friendship connects two pupils in the same team
+ * Optimality:   any valid 2-coloring (no scalar from ans)
+ * Complexity:   O(n + m) time, O(n + m) memory
+ */
 #include "testlib.h"
-#include <vector>
-#include <string>
+#include <bits/stdc++.h>
 using namespace std;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     registerTestlibCmd(argc, argv);
 
     int n = inf.readInt();
     int m = inf.readInt();
-    vector<pair<int, int>> edges;
+    vector<pair<int, int>> friendships;
     for (int i = 0; i < m; i++) {
         int a = inf.readInt();
         int b = inf.readInt();
-        edges.push_back({a, b});
+        friendships.push_back({a, b});
     }
 
     string ansTok = ans.readToken();
-    if (ansTok != "IMPOSSIBLE" && (ansTok != "1" && ansTok != "2"))
-        quitf(_fail, "Invalid judge answer token '%s'", ansTok.c_str());
-
-    string outTok = ouf.readToken();
-    if (outTok == "IMPOSSIBLE") {
-        if (ansTok != "IMPOSSIBLE")
-            quitf(_wa, "Output is IMPOSSIBLE but a valid team assignment exists");
+    if (ansTok == "IMPOSSIBLE") {
+        string oufTok = ouf.readToken();
+        if (oufTok != "IMPOSSIBLE")
+            quitf(_wa, "jury answer is IMPOSSIBLE but contestant printed \"%s\" "
+                       "(claims a valid team assignment exists)",
+                  compress(oufTok).c_str());
         if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: no valid team assignment");
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "correctly reported IMPOSSIBLE");
     }
-
-    if (ansTok == "IMPOSSIBLE")
-        quitf(_wa, "A valid team assignment exists but output is IMPOSSIBLE");
 
     vector<int> team(n + 1);
-    team[1] = stoi(outTok);
-    if (team[1] != 1 && team[1] != 2)
-        quitf(_wa, "Team must be 1 or 2, got %d for pupil 1", team[1]);
-
-    for (int i = 2; i <= n; i++) {
-        team[i] = ouf.readInt();
-        if (team[i] != 1 && team[i] != 2)
-            quitf(_wa, "Team must be 1 or 2, got %d for pupil %d", team[i], i);
-    }
-
+    team[1] = ouf.readInt(1, 2, "team[1]");
     for (int i = 2; i <= n; i++)
-        ans.readInt();
+        team[i] = ouf.readInt(1, 2, format("team[%d]", i).c_str());
 
-    for (auto [a, b] : edges) {
+    for (auto [a, b] : friendships) {
         if (team[a] == team[b])
-            quitf(_wa, "Edge %d-%d connects pupils in same team %d", a, b, team[a]);
+            quitf(_wa, "friendship %d-%d connects pupils in the same team %d", a, b, team[a]);
     }
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid 2-coloring");
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "valid 2-coloring for %d pupils", n);
 }

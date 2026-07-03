@@ -1,65 +1,75 @@
+/*
+ * HEADER CONTRACT
+ * Problem:      1755 Palindrome Reorder
+ * Input read:   string s of length n (letters A-Z)
+ * Validity:     NO SOLUTION iff no palindrome reordering exists; else print a string of
+ *               length n using exactly the same multiset of letters as s, reading the
+ *               same forwards and backwards.
+ * Optimality:   none (any valid palindrome accepted)
+ * Complexity:   O(n) time and memory — frequency counts over 26 letters
+ */
 #include "testlib.h"
-#include <string>
-#include <vector>
+#include <bits/stdc++.h>
 using namespace std;
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[]) {
     registerTestlibCmd(argc, argv);
 
     string s = inf.readToken();
     int n = (int)s.size();
 
-    vector<int> cnt_in(26, 0);
-    for (char c : s)
-        cnt_in[c - 'A']++;
-
-    string ans_first = ans.readToken();
-    if (ans_first == "NO") {
-        string ans_second = ans.readToken();
-        if (ans_second != "SOLUTION")
-            quitf(_fail, "Judge answer malformed: expected NO SOLUTION");
-
-        string ouf_first = ouf.readToken();
-        if (ouf_first != "NO")
-            quitf(_wa, "No palindrome exists but contestant printed '%s'", ouf_first.c_str());
-        string ouf_second = ouf.readToken();
-        if (ouf_second != "SOLUTION")
-            quitf(_wa, "Expected 'NO SOLUTION' but got 'NO %s'", ouf_second.c_str());
-        if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: no palindrome possible");
+    vector<int> cntIn(26, 0);
+    for (char c : s) {
+        if (c < 'A' || c > 'Z')
+            quitf(_fail, "jury input has invalid character '%c'", c);
+        cntIn[c - 'A']++;
     }
 
-    string ouf_first = ouf.readToken();
-    if (ouf_first == "NO")
-        quitf(_wa, "A palindrome exists but contestant printed NO SOLUTION");
+    string ansTok = ans.readToken();
+    if (ansTok == "NO") {
+        string ansSecond = ans.readToken();
+        if (ansSecond != "SOLUTION")
+            quitf(_fail, "judge answer malformed: expected NO SOLUTION");
 
-    string out = ouf_first;
-    while (!ouf.readEof())
-        out += ouf.readToken();
+        string oufFirst = ouf.readToken();
+        if (oufFirst != "NO")
+            quitf(_wa, "jury answer is NO SOLUTION but contestant printed \"%s\"",
+                  compress(oufFirst).c_str());
+        string oufSecond = ouf.readToken();
+        if (oufSecond != "SOLUTION")
+            quitf(_wa, "contestant printed \"NO %s\" but expected NO SOLUTION",
+                  compress(oufSecond).c_str());
+        if (!ouf.seekEof())
+            quitf(_wa, "extra information in the output file");
+        quitf(_ok, "correctly reported NO SOLUTION");
+    }
 
-    if ((int)out.size() != n)
-        quitf(_wa, "Output length %d differs from input length %d", (int)out.size(), n);
+    string oufTok = ouf.readToken();
+    if (oufTok == "NO")
+        quitf(_wa, "a palindrome exists but contestant printed NO SOLUTION");
 
-    vector<int> cnt_out(26, 0);
-    for (char c : out) {
+    if ((int)oufTok.size() != n)
+        quitf(_wa, "output length %d differs from input length %d", (int)oufTok.size(), n);
+
+    vector<int> cntOut(26, 0);
+    for (char c : oufTok) {
         if (c < 'A' || c > 'Z')
-            quitf(_wa, "Invalid character '%c' in output", c);
-        cnt_out[c - 'A']++;
+            quitf(_wa, "invalid character '%c' in output", c);
+        cntOut[c - 'A']++;
     }
     for (int i = 0; i < 26; i++) {
-        if (cnt_out[i] != cnt_in[i])
-            quitf(_wa,
-                  "Character '%c' appears %d times in output but %d times in input",
-                  (char)('A' + i), cnt_out[i], cnt_in[i]);
+        if (cntOut[i] != cntIn[i])
+            quitf(_wa, "character '%c' appears %d times in output but %d times in input",
+                  (char)('A' + i), cntOut[i], cntIn[i]);
     }
 
     for (int i = 0; i < n / 2; i++) {
-        if (out[i] != out[n - 1 - i])
-            quitf(_wa,
-                  "Output is not a palindrome: position %d='%c' vs %d='%c'",
-                  i, out[i], n - 1 - i, out[n - 1 - i]);
+        if (oufTok[i] != oufTok[n - 1 - i])
+            quitf(_wa, "output is not a palindrome: position %d='%c' vs %d='%c'",
+                  i + 1, oufTok[i], n - i, oufTok[n - 1 - i]);
     }
 
-    quitf(_ok, "Valid palindrome of length %d", n);
+    if (!ouf.seekEof())
+        quitf(_wa, "extra information in the output file");
+    quitf(_ok, "valid palindrome of length %d", n);
 }
