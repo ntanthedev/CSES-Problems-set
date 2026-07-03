@@ -54,8 +54,10 @@ GHI CHÚ
 """
 import argparse
 import getpass
+import json
 import re
 import sys
+from urllib.parse import quote
 
 try:
     import requests
@@ -118,11 +120,20 @@ def items_get(items, key):
 
 
 def items_set(items, key, value):
-    for i, (k, _) in enumerate(items):
-        if k == key:
-            items[i] = (key, value)
-            return
+    """Set a single-value field exactly once.
+
+    Django forms sometimes render helper/initial controls around widgets. For
+    fields we actively control (csrf, key, dates, format_name, inline row fields)
+    keeping an older duplicate value is more dangerous than preserving order, so
+    replace every existing pair for that key with one final value. Multi-value
+    fields that must be preserved are left untouched by this helper.
+    """
+    items[:] = [(k, v) for (k, v) in items if k != key]
     items.append((key, value))
+
+
+def items_has(items, key):
+    return any(k == key for k, _ in items)
 
 
 def items_del(items, key):
@@ -215,7 +226,7 @@ class Client:
 
     # ---- pk lookups qua admin changelist (giống admin_problem_pk bên upload.py)
     def _admin_pk(self, app_model, query, want_text=None):
-        r, soup = self.get_soup('/admin/judge/%s/?q=%s' % (app_model, query))
+        r, soup = self.get_soup('/admin/judge/%s/?q=%s' % (app_model, quote(str(query))))
         best = None
         rx = re.compile(r'/admin/judge/%s/(\d+)/change/' % re.escape(app_model))
         for a in soup.find_all('a', href=rx):
@@ -269,7 +280,20 @@ class Client:
             return True
         # in lỗi validation của Django admin cho dễ sửa
         soup = BeautifulSoup(resp.text, _PARSER)
-        errs = [e.get_text(' ', strip=True) for e in soup.select('.errorlist, .errornote')]
+        errs = []
+        for e in soup.select('.errornote'):
+            txt = e.get_text(' ', strip=True)
+            if txt:
+                errs.append(txt)
+        for e in soup.select('.form-row, .field-box, tr.form-row, .inline-related'):
+            err = e.select_one('.errorlist')
+            if not err:
+                continue
+            names = sorted({ctrl.get('name') for ctrl in e.find_all(['input', 'select', 'textarea']) if ctrl.get('name')})
+            label = ','.join(names[:3]) or e.get('class') or 'field'
+            errs.append('%s: %s' % (label, err.get_text(' ', strip=True)))
+        if not errs:
+            errs = [e.get_text(' ', strip=True) for e in soup.select('.errorlist, .errornote')]
         if self.debug:
             open('debug_contest_post.html', 'w', encoding='utf-8').write(resp.text)
             print('  (đã lưu debug_contest_post.html)')
@@ -326,6 +350,36 @@ def fill_datetime(items, form, field, dtstr):
         items_set(items, field, '%s %s' % (d, t))
 
 
+def normalize_create_only_fields(items, opt=None):
+    """Normalize admin-widget defaults that are not safe to POST as-is.
+
+    On CHT-OJ the add-contest form renders the JSONField textarea
+    `format_config` as a lone newline. The browser sends that newline, but
+    jsonfield's form parser rejects it because it is not valid JSON. Use
+    explicit JSON null by default, matching the model help text: "Leave empty
+    to use None".
+    """
+    if items_get(items, 'format_config') is not None:
+        cfg = getattr(opt, 'format_config', None) if opt is not None else None
+        if cfg is None:
+            cfg = items_get(items, 'format_config')
+        cfg = '' if cfg is None else str(cfg).strip()
+        if not cfg:
+            cfg = 'null'
+        try:
+            json.loads(cfg)
+        except Exception as e:
+            raise SystemExit('--format-config phải là JSON hợp lệ: %s' % e)
+        items_set(items, 'format_config', cfg)
+
+    # These are plain TextField values; blank widgets from Ace/Martor often
+    # serialize as "\n". Normalizing avoids dirty data and avoids triggering
+    # Lua validation through a meaningless newline script.
+    for key in ('problem_label_script', 'csv_ranking', 'summary'):
+        if items_get(items, key) is not None and not str(items_get(items, key)).strip():
+            items_set(items, key, '')
+
+
 def resolve_select(form, name, wanted):
     """Khớp `wanted` với VALUE hoặc LABEL (không phân biệt hoa thường) của một
     <select> trên form thật; sai thì liệt kê option và dừng — không đoán bừa."""
@@ -365,6 +419,31 @@ def fill_problem_rows(items, form, prefix, pk_pairs, points, start_index, partia
     items_set(items, '%s-TOTAL_FORMS' % prefix, str(max(current, start_index + len(pk_pairs))))
 
 
+def sanity_check_problem_rows(items, prefix, pk_pairs, start_index, partial=False):
+    """Cheap offline guard before POSTing Django's inline formset.
+
+    It only checks fields this tool is responsible for; server-side validation
+    remains the source of truth. The goal is to catch silent payload bugs such
+    as wrong TOTAL_FORMS, missing problem pk, or accidental partial scoring.
+    """
+    total = int(items_get(items, '%s-TOTAL_FORMS' % prefix) or '0')
+    need = start_index + len(pk_pairs)
+    if total < need:
+        raise SystemExit('%s-TOTAL_FORMS=%s nhưng cần ít nhất %s row' % (prefix, total, need))
+    for i, (_, pk) in enumerate(pk_pairs):
+        idx = start_index + i
+        base = '%s-%d-' % (prefix, idx)
+        if items_get(items, base + 'problem') != pk:
+            raise SystemExit('payload lỗi: %sproblem != %r' % (base, pk))
+        if items_get(items, base + 'points') in (None, ''):
+            raise SystemExit('payload lỗi: thiếu %spoints' % base)
+        has_partial = items_has(items, base + 'partial')
+        if partial and not has_partial:
+            raise SystemExit('payload lỗi: --partial nhưng thiếu %spartial' % base)
+        if not partial and has_partial:
+            raise SystemExit('payload lỗi: CSES binary nhưng vẫn gửi %spartial' % base)
+
+
 def cmd_create(cli, opt):
     path = '/admin/judge/contest/add/'
     soup, form = cli.open_admin_form(path)
@@ -378,6 +457,7 @@ def cmd_create(cli, opt):
         items_set(items, 'description', desc)
     fill_datetime(items, form, 'start_time', opt.start)
     fill_datetime(items, form, 'end_time', opt.end)
+    normalize_create_only_fields(items, opt)
 
     # format_name: form thật liệt kê AtCoder ĐẦU TIÊN; nếu Django không render
     # 'selected' thì serialize_form sẽ vớ nhầm 'atcoder'. Set tường minh, khớp
@@ -410,6 +490,7 @@ def cmd_create(cli, opt):
     print('  inline prefix = %r' % prefix)
     pk_pairs = resolve_codes(cli, opt.problems, opt.code_prefix)
     fill_problem_rows(items, form, prefix, pk_pairs, opt.points_each, start_index=0, partial=opt.partial)
+    sanity_check_problem_rows(items, prefix, pk_pairs, start_index=0, partial=opt.partial)
 
     if opt.dry_run:
         print('\n--dry-run: payload sẽ POST tới %s:' % path)
@@ -432,11 +513,16 @@ def cmd_add_problems(cli, opt):
     prefix = detect_inline_prefix(form)
     if prefix is None:
         raise SystemExit('Không dò được inline formset ContestProblem — chạy `inspect`.')
-    total = int(items_get(items, '%s-TOTAL_FORMS' % prefix) or '0')
+    # On a change form, TOTAL_FORMS includes Django admin's extra blank rows.
+    # Append into the first blank row after existing initial rows, not after all
+    # rendered blanks; otherwise adding to a 3-problem contest with 3 extra rows
+    # would create rows 6.. and orders 7.. instead of rows 3.. and orders 4...
+    start = int(items_get(items, '%s-INITIAL_FORMS' % prefix) or '0')
     pk_pairs = resolve_codes(cli, opt.problems, opt.code_prefix)
-    fill_problem_rows(items, form, prefix, pk_pairs, opt.points_each, start_index=total, partial=opt.partial)
+    fill_problem_rows(items, form, prefix, pk_pairs, opt.points_each, start_index=start, partial=opt.partial)
+    sanity_check_problem_rows(items, prefix, pk_pairs, start_index=start, partial=opt.partial)
     if opt.dry_run:
-        print('\n--dry-run: sẽ thêm %d bài (row %d..%d) vào %s' % (len(pk_pairs), total, total + len(pk_pairs) - 1, opt.key))
+        print('\n--dry-run: sẽ thêm %d bài (row %d..%d) vào %s' % (len(pk_pairs), start, start + len(pk_pairs) - 1, opt.key))
         return
     cli.post_admin_form(path, items)
     print('OK: đã thêm %d bài vào contest %s' % (len(pk_pairs), opt.key))
@@ -493,6 +579,8 @@ def main():
     c.add_argument('--points-each', type=int, default=100)
     c.add_argument('--format', default='default',
                    help="format contest, khớp value/label trên form: default|icpc|ioi16|ioi|atcoder|ecoo|vnoj (mặc định: default)")
+    c.add_argument('--format-config', default=None,
+                   help='JSON cho format_config; mặc định null. Ví dụ VNOJ: "{\"penalty\":5,\"LSO\":false}"')
     c.add_argument('--partial', action='store_true',
                    help='bật partial cho từng bài trong contest (mặc định TẮT — CSES chấm nhị phân)')
     c.add_argument('--description', help='mô tả markdown (mặc định = name)')

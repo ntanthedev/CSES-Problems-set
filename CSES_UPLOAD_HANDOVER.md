@@ -2,7 +2,7 @@
 
 > Hand-off notes so a fresh session (or another developer) can continue without the
 > previous chat history. Read this once top-to-bottom; everything needed is here.
-> The source of truth is the script **`cses_http_upload.py`**; this doc explains why/how.
+> The current source of truth for problem uploading is **`upload_reviewed.py`** (often renamed to `upload.py` locally). The current source of truth for contest creation/management is **`contest_tool_jsonfix.py`** (or the latest `contest_tool.py` after copying that file over). This doc explains why/how.
 
 ---
 
@@ -18,7 +18,7 @@ onto a self-hosted online judge.
 - **Hard constraint:** the operator has **no SSH** to the server. Everything is driven
   **over HTTP from the operator's own machine** with an admin login — *not* `manage.py`.
 
-The tool that does this is **`cses_http_upload.py`** (run locally, often renamed `upload.py`).
+The tool that does problem upload is **`upload_reviewed.py`** (run locally, often renamed `upload.py`). Contest creation is handled separately by **`contest_tool_jsonfix.py`**.
 
 ---
 
@@ -35,12 +35,14 @@ was fragile. Do **not** use `--bilingual`.
 **Left to do:** finish the full 400-problem run, group by group, once each group's
 `statement_vi.md` files are generated.
 
+**Latest tool versions after 2026-07-03 review:** use `upload_reviewed.py` for problem upload and `contest_tool_jsonfix.py` for contest creation. Older `contest_tool.py` versions can fail on `format_config` with `" value must be valid JSON."`.
+
 ### Recommended run sequence
 1. `pip install requests beautifulsoup4 lxml`
-2. Dry run (offline parse check): `python upload.py --root . --dry-run`
-3. Test one *image* problem first: `python upload.py --user ntannn --root . --only 1625 --vi --with-editorial --editorial-public --debug`
+2. Dry run (offline parse check): `python upload_reviewed.py --root . --dry-run`
+3. Test one *image* problem first: `python upload_reviewed.py --user ntannn --root . --only 1625 --vi --with-editorial --editorial-public --debug`
 4. Verify in the UI (see §9), then run a whole group, e.g.:
-   `python upload.py --user ntannn --root . --only 1068 1069 1070 ... --vi --with-editorial --editorial-public`
+   `python upload_reviewed.py --user ntannn --root . --only 1068 1069 1070 ... --vi --with-editorial --editorial-public`
 5. Re-run any group with `--overwrite` to refresh statements/limits/data in place.
 
 > The script auto-prints a full **traceback on the first failure** (and `[file:line]`
@@ -188,7 +190,7 @@ All confirmed by reading the `ntanthedev/CHT-oj` source.
 
 ---
 
-## 6. CLI reference (`cses_http_upload.py`)
+## 6. CLI reference (`upload_reviewed.py`, usually copied to `upload.py`)
 
 Deps: `pip install requests beautifulsoup4 lxml` (lxml important — the create page's
 Martor editor confuses the stdlib HTML parser).
@@ -230,11 +232,11 @@ Martor editor confuses the stdlib HTML parser).
 
 ### Standard command
 ```bash
-python upload.py --user ntannn --root . --vi --with-editorial --editorial-public
+python upload_reviewed.py --user ntannn --root . --vi --with-editorial --editorial-public
 ```
 Refresh an already-uploaded group (also repairs old problems missing group/type):
 ```bash
-python upload.py --user ntannn --root . --only <IDs...> \
+python upload_reviewed.py --user ntannn --root . --only <IDs...> \
     --vi --with-editorial --editorial-public --overwrite
 ```
 
@@ -249,15 +251,15 @@ Problems are created **hidden**. By default the standard command publishes all `
 at the end. To control this:
 ```bash
 # Upload but keep everything HIDDEN (don't publish at the end):
-python upload.py --user ntannn --root . --vi --with-editorial --editorial-public --no-publish
+python upload_reviewed.py --user ntannn --root . --vi --with-editorial --editorial-public --no-publish
 
 # Later: make them PUBLIC (no re-upload, just flips visibility, then exits):
-python upload.py --user ntannn --root . --publish-only              # all cses_*
-python upload.py --user ntannn --root . --only 1068 1069 --publish-only   # a subset
+python upload_reviewed.py --user ntannn --root . --publish-only              # all cses_*
+python upload_reviewed.py --user ntannn --root . --only 1068 1069 --publish-only   # a subset
 
 # Hide them again:
-python upload.py --user ntannn --root . --unpublish-only            # all cses_*
-python upload.py --user ntannn --root . --only 1068 1069 --unpublish-only # a subset
+python upload_reviewed.py --user ntannn --root . --unpublish-only            # all cses_*
+python upload_reviewed.py --user ntannn --root . --only 1068 1069 --unpublish-only # a subset
 ```
 `--no-publish` is a *modifier* on an upload run (upload, stay hidden). `--publish-only`
 / `--unpublish-only` are *standalone* modes that upload nothing and only flip visibility
@@ -359,6 +361,243 @@ A Django management command **`import_cses.py`** also exists (drop into
 faster and more robust (writes DB + data dir directly via `ProblemDataCompiler`), but
 needs shell access, which the operator currently lacks. Same math/header/limit fixes
 apply. Keep it for the day SSH returns.
+
+---
+
+## 11. 2026-07-03 update — `contest_tool.py` / contest creation
+
+A separate HTTP admin tool was added/reviewed for creating and editing contests on CHT-OJ:
+
+- Working file after fixes: **`contest_tool_jsonfix.py`**. It may be copied/renamed to `contest_tool.py` locally.
+- It uses Django admin, not front-end routes:
+  - create: `GET/POST /admin/judge/contest/add/`
+  - edit: `GET/POST /admin/judge/contest/<pk>/change/`
+- It preserves the full admin form defaults and fills only the intended fields.
+- It resolves problem PKs via `/admin/judge/problem/?q=<code>` and the author profile PK via `/admin/judge/profile/?q=<username>`.
+
+### Source files used to verify contest behavior
+
+The following CHT-OJ source files were uploaded/read and used as the basis for the fixes:
+
+```text
+judge/admin/contest.py
+judge/models/contest.py
+judge/contest_format/default.py
+judge/contest_format/registry.py
+judge/contest_format/vnoj.py
+```
+
+Confirmed source facts:
+
+- `ContestAdmin` uses `ContestProblemInline` with fields:
+  `problem`, `points`, `partial`, `is_pretested`, `max_submissions`,
+  `output_prefix_override`, `order`, plus readonly rejudge/rescore columns.
+- The inline formset prefix found on the live site is `contest_problems`.
+- `ContestProblem.partial` has `default=True`; for CSES-style binary scoring, the tool
+  must remove the `partial` checkbox from real rows unless `--partial` is explicitly used.
+- `Contest.format_name` defaults to `default`, but `contest_format.registry.choices()`
+  returns sorted choices. The live form may show AtCoder first, so the tool must explicitly
+  send `format_name=default` rather than relying on the first `<option>`.
+- `Contest.banned_judges` is a ManyToMany to `judge.Judge`, not `Profile`. Do not use
+  the `ntannn` option in `banned_judges` as an author/profile.
+- `Contest.authors` is a ManyToMany to `Profile`; the tool correctly fills the profile
+  PK for the admin user, e.g. `authors -> ntannn (pk 8)`.
+- `Contest.format_config` is a `JSONField`. The old dry-run showed `format_config '\n'`,
+  which fails on real POST with `" value must be valid JSON."`. The fixed tool sends
+  `format_config='null'` for the default format unless `--format-config` is provided.
+
+### Important fixes made to `contest_tool.py`
+
+1. Added explicit `--format`, default `default`.
+   - Prevents silent creation as `atcoder` when the form does not render `selected`.
+2. Added optional `--partial`.
+   - Default behavior removes `contest_problems-<i>-partial` from real rows.
+   - `--partial` re-adds `partial=on` for each real row.
+3. Kept `TOTAL_FORMS` dynamic but never shrinks below the form's current value.
+   - If the add form renders 3 empty rows and you add 3 problems, keep `TOTAL_FORMS=3`.
+   - If you add 5 problems, raise `TOTAL_FORMS=5`.
+   - The `__prefix__` template row may still contain `partial=on`; this is harmless because
+     Django ignores `__prefix__` rows.
+4. Fixed `format_config` JSON validation.
+   - Send `null` for default format.
+   - Added `--format-config` for future custom JSON, e.g. VNOJ penalty config.
+5. Normalized empty textareas that were serialized as `\n`:
+   - `problem_label_script`, `csv_ranking`, `summary`.
+6. Added safer `items_set()` behavior in newer reviewed versions: delete duplicate keys
+   before setting a new single value.
+7. For `add-problems`, append from `INITIAL_FORMS`, not `TOTAL_FORMS`, so extra blank admin
+   rows do not create order gaps.
+8. Added sanity checks for real contest rows before POST.
+
+### Known good dry-run for contest create
+
+This dry-run was checked and is expected to be safe:
+
+```powershell
+python contest_tool_jsonfix.py create --user ntannn `
+  --key luyentap01 `
+  --name "test csesssss" `
+  --start "2026-07-10 19:00" `
+  --end "2026-07-10 22:00" `
+  --problems 1068 1083 1625 `
+  --points-each 100 `
+  --format default `
+  --dry-run
+```
+
+Expected key payload details:
+
+```text
+format_name                              'default'
+format_config                            'null'
+authors                                  '8'
+contest_problems-TOTAL_FORMS             '3'
+contest_problems-0-problem               '<pk for cses_1068>'
+contest_problems-1-problem               '<pk for cses_1083>'
+contest_problems-2-problem               '<pk for cses_1625>'
+# no contest_problems-0-partial / 1-partial / 2-partial unless --partial is used
+```
+
+If POST returns status 200 with:
+
+```text
+" value must be valid JSON.
+```
+
+then the operator is still running an older `contest_tool.py`; copy over `contest_tool_jsonfix.py`.
+
+### Contest create command after fixes
+
+```powershell
+python contest_tool_jsonfix.py create --user ntannn `
+  --key luyentap01 `
+  --name "test csesssss" `
+  --start "2026-07-10 19:00" `
+  --end "2026-07-10 22:00" `
+  --problems 1068 1083 1625 `
+  --points-each 100 `
+  --format default
+```
+
+Add `--visible` only if the contest should be public immediately.
+
+---
+
+## 12. 2026-07-03 update — `upload.py` review against full CHT-OJ source
+
+The full CHT-OJ GitHub source was uploaded as `oj-master.zip` and extracted locally. The upload tool was reviewed against the real source, not just upstream assumptions. The reviewed/fixed script is:
+
+```text
+upload_reviewed.py
+```
+
+This can be copied over local `upload.py` once accepted.
+
+### High-level review result
+
+The core routes and strategy were confirmed as correct:
+
+- Login: `POST /accounts/login/`
+- Create problem: `POST /problems/create`
+- Edit problem: `POST /problem/<code>/edit`
+- Test data: `POST /problem/<code>/test_data`
+- Image upload: `POST /widgets/martor/upload-image`
+- Publish/unpublish: admin actions on `/admin/judge/problem/`
+- Editorial: front-end problem edit form with `solution` formset
+
+`--bilingual` remains intentionally dropped. Do not revive it unless someone wants to rework the fragile admin `ProblemTranslation` inline path carefully.
+
+### Fixes made in `upload_reviewed.py`
+
+1. **Overwrite test data now deletes old cases.**
+
+   In real CHT-OJ, the test-data page has a `cases` formset. If an existing problem has old cases, a naive overwrite that sends `cases-INITIAL_FORMS=0` can append new cases without deleting old ones. The reviewed script now preserves existing initial rows, marks them with `DELETE=on`, and appends new cases after `INITIAL_FORMS`.
+
+   Expected overwrite behavior:
+
+   ```text
+   cases-INITIAL_FORMS = <old case count>
+   cases-TOTAL_FORMS   = <old case count + new case count>
+   cases-0-DELETE      = on
+   cases-1-DELETE      = on
+   ...
+   cases-<old+n>-input_file/output_file/points = new cases
+   ```
+
+2. **Overwrite now resets problem `partial`.**
+
+   Create already removed `partial` by default for CSES binary scoring. Older `update_problem()` preserved whatever checkbox state was on the edit form. The reviewed script now removes `partial` on overwrite unless `--partial` is explicitly passed.
+
+3. **JPEG image upload now uses `.jpeg`, not `.jpg`.**
+
+   The CHT-OJ settings contain a subtle safe-extension issue where `.jpg` may not be accepted as expected, while `.jpeg` is safe. The reviewed script maps JPEG magic bytes to `.jpeg` and MIME `image/jpeg`.
+
+4. **Image upload response is now validated.**
+
+   Martor can return JSON with a `link` string that is actually an error message. The reviewed script now checks that `link` looks like a usable URL/path before rewriting Markdown image references.
+
+5. **Problem edit/editorial payloads now preserve multi-value fields.**
+
+   The edit form contains multiple formsets and multi-select fields. The reviewed script uses list-style `(name, value)` payloads where needed instead of lossy dict conversion, reducing the chance of wiping fields such as `types` or language limits.
+
+6. **Admin search query values are URL-encoded.**
+
+   Admin PK lookup and publish-only query building now use safe quoting for search values.
+
+7. **Checker manifest validation is stricter.**
+
+   `checker_args` must be a JSON object/dict. Invalid manifest entries fail early before POSTing to the OJ.
+
+### Offline checks run for `upload_reviewed.py`
+
+```bash
+python3 -m py_compile /mnt/data/upload_reviewed.py
+```
+
+Additional local tests confirmed:
+
+```text
+upload_data overwrite payload OK
+jpeg ext OK
+```
+
+### Recommended command after this review
+
+Dry-run:
+
+```bash
+python upload_reviewed.py --root . --vi --dry-run
+```
+
+Test one known image problem:
+
+```bash
+python upload_reviewed.py --user ntannn --root . --only 1625 --vi --with-editorial --editorial-public --debug
+```
+
+Full/resume run:
+
+```bash
+python upload_reviewed.py --user ntannn --root . --vi --with-editorial --editorial-public
+```
+
+Overwrite repair for already uploaded problems:
+
+```bash
+python upload_reviewed.py --user ntannn --root . --only 1068 1083 1625 \
+  --vi --with-editorial --editorial-public --overwrite --debug
+```
+
+### What to verify after using `upload_reviewed.py`
+
+For a repaired/uploaded problem, check:
+
+- old duplicate test cases are gone after `--overwrite`;
+- problem-level `partial` is off unless `--partial` was intended;
+- image problem 1625 displays the image normally;
+- editorial still appears and is public if `--editorial-public` was used;
+- all submission languages remain available;
+- `solution.cpp` still gets AC.
 
 ---
 

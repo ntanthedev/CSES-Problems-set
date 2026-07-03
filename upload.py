@@ -58,6 +58,7 @@ import sys
 import time
 import traceback
 import zipfile
+from urllib.parse import quote
 
 try:
     import requests
@@ -270,6 +271,9 @@ def load_checker_manifest(root, path=None):
         if mode not in CHECKER_MODES:
             sys.exit('CHECKER_MANIFEST.json: problem %s has unknown checker %r (must be one of %s)'
                      % (pid, mode, ', '.join(CHECKER_MODES)))
+        args = spec.get('checker_args')
+        if args is not None and not isinstance(args, dict):
+            sys.exit('CHECKER_MANIFEST.json: problem %s checker_args must be a JSON object/dict' % pid)
         if mode == 'bridged':
             ctype = spec.get('checker_type', 'testlib')
             if ctype not in CHECKER_TYPE_LABELS:
@@ -382,6 +386,11 @@ def items_set(items, key, value):
     items.append((key, value))
 
 
+def items_del(items, key):
+    """Delete ALL pairs for key from a list-style payload."""
+    items[:] = [(k, v) for (k, v) in items if k != key]
+
+
 def first_nonempty(options):
     for v in options.values():
         if v:
@@ -418,7 +427,9 @@ def detect_image(file_path):
     if sig[:8] == b'\x89PNG\r\n\x1a\n':
         return 'png', 'image/png'
     if sig[:3] == b'\xff\xd8\xff':
-        return 'jpg', 'image/jpeg'
+        # CHT-OJ settings accidentally omit .jpg from MARTOR_UPLOAD_SAFE_EXTS
+        # ('.py' '.jpg' is concatenated into '.py.jpg'), while .jpeg is allowed.
+        return 'jpeg', 'image/jpeg'
     if sig[:6] in (b'GIF87a', b'GIF89a'):
         return 'gif', 'image/gif'
     if sig[:4] == b'RIFF' and sig[8:12] == b'WEBP':
@@ -627,12 +638,29 @@ class Uploader:
                 if args is not None:
                     data['problem-data-checker_args'] = json.dumps(args, ensure_ascii=False)
 
+        # Cases formset. On a fresh problem INITIAL_FORMS=0. On --overwrite,
+        # the page already contains the old testcases as initial forms. If we post
+        # INITIAL_FORMS=0 unconditionally, Django adds the new cases without
+        # deleting the old ones, so init.yml is generated from duplicated cases.
+        # Preserve existing initial rows and mark them DELETE, then append the new
+        # cases after them. Deleted rows keep their original fields so the formset
+        # can validate them before deletion.
+        old_initial = int(defaults.get('cases-INITIAL_FORMS', '0') or '0')
         n = len(cases)
-        data['cases-TOTAL_FORMS'] = str(n)
-        data['cases-INITIAL_FORMS'] = '0'
-        data['cases-MIN_NUM_FORMS'] = '0'
-        data['cases-MAX_NUM_FORMS'] = '10000'
-        for i, (order, in_name, out_name) in enumerate(cases):
+        data['cases-TOTAL_FORMS'] = str(old_initial + n)
+        data['cases-INITIAL_FORMS'] = str(old_initial)
+        data['cases-MIN_NUM_FORMS'] = defaults.get('cases-MIN_NUM_FORMS', '0') or '0'
+        data['cases-MAX_NUM_FORMS'] = defaults.get('cases-MAX_NUM_FORMS', '10000') or '10000'
+
+        for i in range(old_initial):
+            p = 'cases-%d-' % i
+            for k, v in defaults.items():
+                if k.startswith(p):
+                    data[k] = v
+            data[p + 'DELETE'] = 'on'
+
+        for j, (order, in_name, out_name) in enumerate(cases):
+            i = old_initial + j
             p = 'cases-%d-' % i
             data[p + 'id'] = ''
             data[p + 'order'] = str(order)
@@ -720,8 +748,8 @@ class Uploader:
             raise RuntimeError('image upload returned non-JSON (status %s): %s'
                                % (resp.status_code, resp.text[:160].replace('\n', ' ')))
         link = j.get('link') or j.get('url')
-        if not link:
-            raise RuntimeError('image upload failed: %s' % str(j)[:200])
+        if not link or not (str(link).startswith('/') or str(link).startswith('http://') or str(link).startswith('https://')):
+            raise RuntimeError('image upload failed or returned a non-URL link: %s' % str(j)[:200])
         return link
 
     def process_images(self, body, pdir, cache):
@@ -738,7 +766,7 @@ class Uploader:
         return IMG_RE.sub(repl, body)
 
     # -- update an existing problem's statement/limits via the edit form ----- #
-    def update_problem(self, code, body, tl, mem_kb, points, testcase_visibility,
+    def update_problem(self, code, body, tl, mem_kb, points, partial, testcase_visibility,
                        group_label, type_label, default_type_label):
         path = '/problem/%s/edit' % code
         r, soup = self._get_soup(path)
@@ -747,15 +775,22 @@ class Uploader:
             if self.debug:
                 self._diagnose('edit', r, soup)
             raise RuntimeError('could not open the edit form (not editable?)')
-        payload = form_defaults(form)
-        payload['csrfmiddlewaretoken'] = self._csrf(soup)
-        payload.pop('statement_file', None)
-        payload.pop('testers', None)
-        payload['description'] = body
-        payload['time_limit'] = ('%g' % tl)
-        payload['memory_limit'] = str(mem_kb)
-        payload['points'] = ('%g' % points)
-        payload['testcase_visibility_mode'] = testcase_visibility
+        # Use list-style serialization to preserve multi-value fields such as
+        # `types`; a dict would silently keep only one selected value.
+        payload = form_payload_multi(form)
+        items_set(payload, 'csrfmiddlewaretoken', self._csrf(soup))
+        items_del(payload, 'statement_file')
+        items_del(payload, 'testers')
+        items_set(payload, 'description', body)
+        items_set(payload, 'time_limit', ('%g' % tl))
+        items_set(payload, 'memory_limit', str(mem_kb))
+        items_set(payload, 'points', ('%g' % points))
+        items_set(payload, 'testcase_visibility_mode', testcase_visibility)
+        # Keep overwrite semantics aligned with create_problem: CSES is binary by
+        # default, so unchecked partial must be omitted from the POST.
+        items_del(payload, 'partial')
+        if partial:
+            items_set(payload, 'partial', 'on')
         # Old problems may have no group/type set, which the edit form would
         # otherwise resubmit empty ("" is not a valid value). Re-resolve them.
         groups = select_options(form, 'group')
@@ -763,11 +798,11 @@ class Uploader:
         gpk = resolve_option(groups, group_label)
         tpk = resolve_option(types, type_label, default_type_label)
         if gpk:
-            payload['group'] = gpk
+            items_set(payload, 'group', gpk)
         if tpk:
-            payload['types'] = tpk
-        if not payload.get('submission_source_visibility_mode'):
-            payload['submission_source_visibility_mode'] = 'F'
+            items_set(payload, 'types', tpk)
+        if not items_get(payload, 'submission_source_visibility_mode'):
+            items_set(payload, 'submission_source_visibility_mode', 'F')
         resp = self.s.post(self.url(path), data=payload,
                            headers={'Referer': self.url(path)},
                            allow_redirects=False, timeout=120)
@@ -789,10 +824,12 @@ class Uploader:
                 self._diagnose('edit', r, soup)
             raise RuntimeError('could not open the edit form (not editable?)')
 
-        payload = form_defaults(form)
-        payload['csrfmiddlewaretoken'] = self._csrf(soup)
-        payload.pop('statement_file', None)
-        payload.pop('testers', None)
+        # Preserve multi-value fields and both management forms
+        # (language-limit + solution formsets) while injecting the editorial.
+        payload = form_payload_multi(form)
+        items_set(payload, 'csrfmiddlewaretoken', self._csrf(soup))
+        items_del(payload, 'statement_file')
+        items_del(payload, 'testers')
 
         # locate the Solution formset prefix (the one that has a "...-content" field)
         prefix = None
@@ -804,17 +841,18 @@ class Uploader:
         if prefix is None:
             prefix = 'solution'   # Django's default accessor name for this O2O inline
 
-        total = int(payload.get('%s-TOTAL_FORMS' % prefix, '0') or '0')
+        total = int(items_get(payload, '%s-TOTAL_FORMS' % prefix) or '0')
         if total < 1:
-            payload['%s-TOTAL_FORMS' % prefix] = '1'
+            items_set(payload, '%s-TOTAL_FORMS' % prefix, '1')
         base = '%s-0-' % prefix
-        payload[base + 'content'] = content
-        payload[base + 'publish_on'] = publish_date          # <input type=date> -> YYYY-MM-DD
-        payload.setdefault(base + 'id', '')
-        payload.pop(base + 'authors', None)                  # optional, leave empty
-        payload.pop(base + 'is_public', None)
+        items_set(payload, base + 'content', content)
+        items_set(payload, base + 'publish_on', publish_date)          # <input type=date> -> YYYY-MM-DD
+        if items_get(payload, base + 'id') is None:
+            items_set(payload, base + 'id', '')
+        items_del(payload, base + 'authors')                  # optional, leave empty
+        items_del(payload, base + 'is_public')
         if is_public:
-            payload[base + 'is_public'] = 'on'
+            items_set(payload, base + 'is_public', 'on')
 
         resp = self.s.post(self.url(path), data=payload,
                            headers={'Referer': self.url(path)},
@@ -827,7 +865,7 @@ class Uploader:
 
     # -- step 3c: a translation (ProblemTranslation) via the admin form ------ #
     def admin_problem_pk(self, code):
-        r, soup = self._get_soup('/admin/judge/problem/?q=%s' % code)
+        r, soup = self._get_soup('/admin/judge/problem/?q=%s' % quote(code))
         best = None
         for a in soup.find_all('a', href=re.compile(r'/admin/judge/problem/(\d+)/change/')):
             m = re.search(r'/problem/(\d+)/change/', a['href'])
@@ -911,7 +949,7 @@ class Uploader:
     def set_public_prefix(self, prefix, make_public=True):
         """Run the publish/unpublish admin action on ALL problems whose code
         matches `prefix` (via the changelist search + select_across)."""
-        path = '/admin/judge/problem/?q=%s' % prefix
+        path = '/admin/judge/problem/?q=%s' % quote(prefix)
         r, soup = self._get_soup(path)
         if soup.find('form', id='changelist-form') is None and form_containing(soup, 'action') is None:
             raise RuntimeError('Could not open admin changelist (is the account staff/superuser?).')
@@ -1150,7 +1188,7 @@ def main():
                                   TESTCASE_VIS[opt.testcase_visibility])
                 print('[%s] %s -> created %s' % (pid, name, code))
             elif opt.overwrite:
-                up.update_problem(code, body, tl, mem, opt.points,
+                up.update_problem(code, body, tl, mem, opt.points, opt.partial,
                                   TESTCASE_VIS[opt.testcase_visibility],
                                   opt.group,
                                   cat if opt.type_from_category else opt.default_type,
