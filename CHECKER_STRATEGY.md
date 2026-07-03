@@ -186,6 +186,28 @@ done with hand-written generic checkers, §2b), but treat "generated" and
 
 ---
 
+## 3b. Two mistakes in the original prompt (fixed)
+
+The first draft of §4 told models to (a) **avoid `ans`** and recompute optimality from
+`inf`, and (b) use **`ensuref`**. Both caused serious production bugs:
+
+1. **No `ans` → heavy algorithms in checkers.** Models copied max-flow, MCMF,
+   suffix arrays, brute-force coloring, etc. into `checker.cpp`. Example: Grid
+   Puzzle II (2131) ballooned to 230+ lines with a full min-cost max-flow solver
+   inside the checker, blowing time limits. **Fix:** read optimal scalars
+   (`k`, cost, length, `IMPOSSIBLE` flag, …) from `ans`; only run lightweight
+   validity simulation on `ouf`.
+2. **`ensuref` → exit code 3, not WA.** DMOJ/VNOJ bridged testlib maps exit 3 to
+   "assertion failed", not a normal wrong answer — confusing for contestants and
+   breaking mutation tests (`ASSERT-FAIL` instead of `WA`). **Fix:** always
+   `if (!cond) quitf(_wa, "...");`.
+
+The generic "any order" checkers (`checker_unordered_*.cpp`) already followed the
+correct pattern (read `ans`, `quitf(_wa)`). The per-problem batch did not, until
+the §4 rewrite.
+
+---
+
 ## 4. Checker-generation prompt (mirrors your existing translator-subagent pattern)
 
 Same shape as the translation prompt in `CSES_UPLOAD_HANDOVER.md` §7: fixed
@@ -204,25 +226,46 @@ INPUT PROVIDED:
 WRITE checker.cpp that:
 1. Reads the input via `inf` (matches statement_en.md's input format exactly).
 2. Reads the contestant's output via `ouf`.
-3. Verifies EVERY constraint the problem statement actually states, not just
-   "looks plausible" — re-read the Constraints/Output sections before writing
-   the check. If the problem says "any valid answer", the checker must accept
-   ALL answers satisfying the stated conditions, not just the one shape
-   solution.cpp happens to produce.
-4. Uses `ouf.readInt()/readLong()/readToken()` — never raw cin/scanf — so
-   testlib's built-in "wrong output format" / EOF handling applies.
-5. On success: `quitf(_ok, "...")`. On failure: `ensuref(cond, "...")` or
-   `quitf(_wa, "...")`. Do not use `_pe` unless the problem genuinely has a
-   format section distinct from a validity section.
-6. Do NOT read or compare against a reference/judge answer file (`ans`) unless
-   the problem is genuinely NOT "any valid answer" (e.g. it also needs to
-   check optimality against a known value derivable from input alone — in
-   that case compute the target from `inf`, not from `ans`).
+3. Reads the judge reference via `ans` (N.out on disk). This is ONE valid answer
+   and carries the trusted optimal value(s) for the test case.
+4. Verifies EVERY constraint the problem statement states against inf+ouf
+   (validity): e.g. a path stays on the grid, a permutation uses 1..n exactly,
+   row/column counts match. Accept ANY output shape that satisfies these rules,
+   not only the shape solution.cpp happens to produce.
+5. For optimality (maximum, minimum, shortest length, min cost, etc.): read the
+   target scalar(s) from `ans` with ans.readInt()/readLong()/readToken() and
+   require ouf to match. NEVER reimplement heavy algorithms in the checker
+   (no max-flow, MCMF, suffix arrays, brute-force chromatic number, full 2-SAT
+   solvers, etc.) — the judge answer already computed the optimum; your job is
+   cheap validity + compare the optimum to ans. Lightweight checks that only
+   VERIFY a claimed structure (simulate a path, check topo order, check a
+   matching's edges exist) are fine.
+6. When several fields are free (which path, which matching pairs, grid layout)
+   but a scalar is fixed (k, cost, distance): compare only that scalar to ans;
+   do NOT byte-compare ouf to ans.
+7. IMPOSSIBLE / NO / -1 outputs: if ouf reports impossible, ans must too (read
+   ans first or compare tokens); if ouf gives a solution, ans must not be impossible.
+8. Uses ouf.readInt()/readLong()/readToken() for ouf — never raw cin/scanf on ouf.
+9. On failure ALWAYS use quitf(_wa, "..."). NEVER use ensuref (it exits with code
+   3 = assertion failed, not WA). On success: quitf(_ok, "..."). Use _pe only for
+   genuine format errors distinct from validity.
+10. Pattern: if (!cond) quitf(_wa, "..."); throughout.
+11. After reading all expected output, reject trailing junk with:
+    `if (!ouf.seekEof()) quitf(_wa, "Extra information in the output file");`
+    Do NOT call bare `ouf.seekEof();` (ignores the result). Do NOT use `ouf.readEof()`
+    (testlib's readEof does not skip trailing whitespace before checking EOF).
+12. WA messages must match the branch: if judge answer is impossible (-1 / IMPOSSIBLE)
+    but contestant printed a solution, say "Expected -1, but contestant claimed …"
+    — never "output is -1" (that describes the opposite mistake).
+13. Read `inf` with plain `inf.readInt()` / `readLine()` — no hard bounds on inf,
+    no `inf.readEoln()` (jury input is trusted; strict EOL checks cause false jury
+    errors on CRLF/LF differences).
 
-SELF-CHECK before finishing: would this checker accept solution.cpp's output
-even if solution.cpp is compiled and run FRESH on a test input, independent
-of whatever happens to be sitting in N.out? If you can't answer yes with
-confidence, re-read the constraints section and tighten the check.
+SELF-CHECK before finishing:
+- Does it use ans for every optimum the statement requires?
+- Is the checker free of copied solution algorithms?
+- Would solution.cpp's fresh output pass (validity + optimal scalars match ans)?
+- No ensuref anywhere?
 
 Output ONLY the C++ source, no explanation, no ```cpp wrapper.
 ```
@@ -303,7 +346,19 @@ no entry is completely unaffected — still `standard`, exactly like today.
   omitted, so most entries can just be `{"checker": "bridged"}` once
   `checker.cpp` sits next to `solution.cpp` in the problem's folder.
 - `checker_args` is optional JSON, submitted as-is (mainly useful for the
-  `floats` family's `precision`/`error_mode`).
+  `floats` family's `precision`/`error_mode`). For `bridged`, you don't need
+  to set this yourself — `upload.py` now builds it automatically as
+  `{"files": "<checker_file>", "type": "<checker_type>"}` (merging in
+  anything you do specify). This was **not** obvious from the form alone:
+  picking "Trình chấm ngoài" + a `checker_type` + uploading the file is not
+  sufficient by itself. A real test submission (Necessary Cities / `cses_2077`)
+  crashed at grading time with `TypeError: check() missing 1 required
+  positional argument: 'files'` (`judge/graders/standard.py`) — the
+  judge-server's bridged checker reads `files`/`type` from `checker_args`
+  itself, not from the uploaded filename or the `checker_type` dropdown. Fixed
+  in `upload.py`; if you ever see that exact traceback again on a *different*
+  bridged problem, it means its manifest entry's `checker_file` doesn't match
+  the file that actually got uploaded — check for a typo.
 - The dropdown value for every mode is resolved **from the live page's actual
   label text** at upload time (`resolve_strict()` in `upload.py`), the same
   way `group`/`type` already are — never a hardcoded slug — so this survives

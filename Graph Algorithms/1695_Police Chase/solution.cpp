@@ -1,87 +1,77 @@
-#include <iostream>
-#include <vector>
+#include <bits/stdc++.h>
+
 using namespace std;
-using ll = long long;
 
-struct MaxFlow {
-    static const ll INF = 1e18;
+const int maxN = 501;
+const int INF = 0x3f3f3f3f;
 
-    struct Edge {
-        int from;
-        int to;
-        ll w;
-        bool real;
-    };
+int N, M, p[maxN], cap[maxN][maxN];
+bool vis[maxN];
+vector<int> G[maxN];
 
-    int n, source, sink;
-    vector<vector<int>> g;
-    vector<Edge> edges;
-    vector<bool> seen;
-    ll flow = 0;
+int bfs(int s = 1, int t = 0) {
+    fill(p + 1, p + N + 1, -1);
+    p[s] = -2;
 
-    MaxFlow(int n, int source, int sink)
-        : n(n), source(source), sink(sink), g(n) {}
+    queue<pair<int, int>> Q;
+    Q.push({s, INF});
+    while (!Q.empty()) {
+        int u = Q.front().first;
+        int f = Q.front().second;
+        Q.pop();
 
-    int add_edge(int from, int to, ll forward, ll backward = 0) {
-        const int id = (int)edges.size();
-        g[from].emplace_back(id);
-        edges.push_back({from, to, forward, true});
-        g[to].emplace_back(id + 1);
-        edges.push_back({to, from, backward, false});
-        return id;
-    }
-
-    bool dfs(int node, ll lim) {
-        if (node == sink) return true;
-        if (seen[node]) return false;
-        seen[node] = true;
-        for (int i : g[node]) {
-            auto &e = edges[i];
-            auto &back = edges[i ^ 1];
-            if (e.w >= lim) {
-                if (dfs(e.to, lim)) {
-                    e.w -= lim;
-                    back.w += lim;
-                    return true;
-                }
+        for (int v : G[u]) {
+            if (p[v] == -1 && cap[u][v]) {
+                p[v] = u;
+                int aug = min(f, cap[u][v]);
+                if (v == t) return aug;
+                Q.push({v, aug});
             }
         }
-        return false;
     }
 
-    ll max_flow() {
-        for (ll bit = 1ll << 62; bit > 0; bit /= 2) {
-            bool found = false;
-            do {
-                seen.assign(n, false);
-                found = dfs(source, bit);
-                flow += bit * found;
-            } while (found);
+    return 0;
+}
+
+void dfs(int u = 1) {
+    vis[u] = true;
+    for (int v : G[u])
+        if (!vis[v] && cap[u][v])
+            dfs(v);
+}
+
+int maxflow(int s = 1, int t = 0) {
+    int flow = 0, aug = 0;
+    while ((aug = bfs(s, t))) {
+        flow += aug;
+        int u = t;
+        while (u != s) {
+            int v = p[u];
+            cap[v][u] -= aug;
+            cap[u][v] += aug;
+            u = v;
         }
-        return flow;
     }
-};
+    return flow;
+}
 
 int main() {
-    int n, m;
-    cin >> n >> m;
-
-    MaxFlow flow(n + 1, 1, n);
-    for (int i = 0; i < m; ++i) {
-        int a, b;
-        cin >> a >> b;
-        flow.add_edge(a, b, 1, 1);
+    scanf("%d %d", &N, &M);
+    for (int i = 0, a, b; i < M; i++) {
+        scanf("%d %d", &a, &b);
+        G[a].push_back(b);
+        G[b].push_back(a);
+        cap[a][b]++;
+        cap[b][a]++;
     }
 
-    cout << flow.max_flow() << "\n";
+    printf("%d\n", maxflow(1, N));
 
-    for (int node = 1; node <= n; node++) {
-        if (!flow.seen[node]) continue;
-        for (auto id : flow.g[node]) {
-            auto edge = flow.edges[id];
-            if (!flow.seen[edge.to] && edge.w == 0 && edge.real) {
-                cout << node << " " << edge.to << "\n";
-            }
-        }
+    dfs();
+    for (int u = 1; u <= N; u++) {
+        if (!vis[u]) continue;
+        for (int v : G[u])
+            if (!vis[v])
+                printf("%d %d\n", u, v);
     }
 }

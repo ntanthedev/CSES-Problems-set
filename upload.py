@@ -1141,7 +1141,7 @@ def main():
                 continue
 
             body = up.process_images(body, pdir, img_cache)   # upload images, center them
-            source = 'CSES (https://cses.fi/problemset/task/%s)' % pid
+            source = 'CSES'
             if not exists:
                 up.create_problem(code, name, body, tl, mem, opt.points, opt.partial,
                                   source, opt.group,
