@@ -1,44 +1,55 @@
-#include "testlib.h"
-#include <vector>
-using namespace std;
+/*
+
+* Problem:      3308 Graph Coloring
+* Input read:   n, m; m undirected edges
+* Validity:     Output k colors and n color labels in [1,k]; adjacent nodes must have
+* ```
+            different colors
+* Optimality:   k must equal the minimum number of colors from ans
+* Complexity:   O(n + m) time, O(n + m) memory
+  */
+  #include "testlib.h"
+  #include <bits/stdc++.h>
+  using namespace std;
 
 int main(int argc, char* argv[]) {
-    registerTestlibCmd(argc, argv);
+registerTestlibCmd(argc, argv);
 
-    int n = inf.readInt();
-    int m = inf.readInt();
-    vector<vector<bool>> adj(n + 1, vector<bool>(n + 1, false));
-    for (int i = 0; i < m; i++) {
-        int a = inf.readInt();
-        int b = inf.readInt();
-        adj[a][b] = adj[b][a] = true;
+int n = inf.readInt();
+int m = inf.readInt();
+
+vector<pair<int, int>> edges;
+edges.reserve(m);
+
+for (int i = 0; i < m; i++) {
+    int a = inf.readInt();
+    int b = inf.readInt();
+    edges.push_back({a, b});
+}
+
+int optimal = ans.readInt();
+
+int k = ouf.readInt(1, n, "number of colors");
+if (k != optimal) {
+    quitf(_wa, "contestant printed %d colors, but optimum is %d", k, optimal);
+}
+
+vector<int> color(n + 1);
+
+for (int i = 1; i <= n; i++) {
+    color[i] = ouf.readInt(1, k, format("color[%d]", i).c_str());
+}
+
+for (auto [a, b] : edges) {
+    if (color[a] == color[b]) {
+        quitf(_wa, "edge %d-%d connects nodes with the same color %d",
+              a, b, color[a]);
     }
+}
 
-    int k_ans = ans.readInt();
-    int k = ouf.readInt();
-    if (k != k_ans)
-        quitf(_wa, "Claimed %d colors but optimal is %d", k, k_ans);
-    if (k < 1 || k > n)
-        quitf(_wa, "Number of colors %d out of range [1,%d]", k, n);
+if (!ouf.seekEof())
+    quitf(_wa, "extra information in the output file");
 
-    vector<int> col(n + 1);
-    for (int i = 1; i <= n; i++) {
-        col[i] = ouf.readInt();
-        if (col[i] < 1 || col[i] > k)
-            quitf(_wa, "Node %d has color %d (must be 1..%d)", i, col[i], k);
-    }
+quitf(_ok, "valid optimal coloring with %d colors", k);
 
-    for (int i = 1; i <= n; i++)
-        ans.readInt();
-
-    for (int i = 1; i <= n; i++) {
-        for (int j = i + 1; j <= n; j++) {
-            if (adj[i][j] && col[i] == col[j])
-                quitf(_wa, "Edge %d-%d connects nodes of same color %d", i, j, col[i]);
-        }
-    }
-
-    if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid optimal coloring with %d colors", k);
 }

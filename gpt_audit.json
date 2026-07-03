@@ -1,0 +1,448 @@
+[
+  {
+    "problem": "2414_List of Sums",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.005017785999999802
+  },
+  {
+    "problem": "3294_Subarray Sum Constraints",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.10971275400000025
+  },
+  {
+    "problem": "3361_Two Array Average",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.03192810099999832
+  },
+  {
+    "problem": "3404_Permutation Subsequence",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.09920963300000096
+  },
+  {
+    "problem": "1698_Swap Round Sorting",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.07674615300000198
+  },
+  {
+    "problem": "1709_Coin Grid",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.004169882999988772
+  },
+  {
+    "problem": "2075_Reversal Sorting",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.043254736999998045
+  },
+  {
+    "problem": "2131_Grid Puzzle II",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 31,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.005623829999990448
+  },
+  {
+    "problem": "1134_Prüfer Code",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 47,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.2645805610000025
+  },
+  {
+    "problem": "1685_New Flight Routes",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 15,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.20239090399999782
+  },
+  {
+    "problem": "1704_Network Renovation",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 14,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.10463617999999997
+  },
+  {
+    "problem": "1756_Acyclic Graph Edges",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 37,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.23149956600001076
+  },
+  {
+    "problem": "3308_Graph Coloring",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.004529690999987679
+  },
+  {
+    "problem": "2129_Task Assignment",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 20,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.008342322999993712
+  },
+  {
+    "problem": "2130_Distinct Routes II",
+    "status": "WARN",
+    "failures": [],
+    "warnings": [
+      "case 8: hostile \"first int -> -1\" được AC — kiểm tra lại bằng tay"
+    ],
+    "lint": [],
+    "max_checker_wall": 0.0052238950000003115
+  },
+  {
+    "problem": "2214_Inverse Inversions",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.2962753790000079
+  },
+  {
+    "problem": "2423_Filling Trominos",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 32,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.06691043799997942
+  },
+  {
+    "problem": "3422_Third Permutation",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.06632879800000069
+  },
+  {
+    "problem": "3423_Permutation Prime Sums",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.045016798999995444
+  },
+  {
+    "problem": "3424_Distinct Sums Grid",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.19770952300001454
+  },
+  {
+    "problem": "3403_Longest Common Subsequence",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.004717115999994803
+  },
+  {
+    "problem": "1193_Labyrinth",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.014248362000017778
+  },
+  {
+    "problem": "1197_Cycle Finding",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.006354345000005424
+  },
+  {
+    "problem": "1666_Building Roads",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.06123515300001259
+  },
+  {
+    "problem": "1667_Message Route",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.09474184100000116
+  },
+  {
+    "problem": "1668_Building Teams",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.0692938530000049
+  },
+  {
+    "problem": "1669_Round Trip",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.1196106440000051
+  },
+  {
+    "problem": "1678_Round Trip II",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.19621839600000612
+  },
+  {
+    "problem": "1679_Course Schedule",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.11269273599998542
+  },
+  {
+    "problem": "1680_Longest Flight Route",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.1959184760000312
+  },
+  {
+    "problem": "1682_Flight Routes Check",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 21,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.3653860869999903
+  },
+  {
+    "problem": "1683_Planets and Kingdoms",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 15,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.23750958099998343
+  },
+  {
+    "problem": "1689_Knights Tour",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.00720111700002235
+  },
+  {
+    "problem": "1695_Police Chase",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.006894167999973888
+  },
+  {
+    "problem": "1696_School Dance",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.008710572999973465
+  },
+  {
+    "problem": "1711_Distinct Routes",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.008782890999952997
+  },
+  {
+    "problem": "1070_Permutations",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.23418586099995764
+  },
+  {
+    "problem": "1092_Two Sets",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.2663815899999804
+  },
+  {
+    "problem": "2165_Tower of Hanoi",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.006272728999988431
+  },
+  {
+    "problem": "3399_Raab Game I",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.032312442000034025
+  },
+  {
+    "problem": "3355_Sum of Four Squares",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.004710197999997945
+  },
+  {
+    "problem": "1164_Room Allocation",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 37,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.21886765800002195
+  },
+  {
+    "problem": "1640_Sum of Two Values",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.06039055899998402
+  },
+  {
+    "problem": "1111_Longest Palindrome",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.06865583699999434
+  },
+  {
+    "problem": "2106_Repeating Substring",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [],
+    "max_checker_wall": 0.010543672999972387
+  },
+  {
+    "problem": "3225_Inverse Suffix Array",
+    "status": "WARN",
+    "failures": [],
+    "warnings": [
+      "case 5: hostile \"first int -> -1\" được AC — kiểm tra lại bằng tay"
+    ],
+    "lint": [],
+    "max_checker_wall": 0.03343103700001393
+  },
+  {
+    "problem": "2079_Finding a Centroid",
+    "status": "PASS",
+    "failures": [],
+    "warnings": [],
+    "lint": [
+      {
+        "severity": "info",
+        "line": 20,
+        "msg": "ma trận 2 chiều — kiểm tra lại N tối đa: N=1e5 là ~1.25GB với vector<vector<bool>>  [nhóm 3]"
+      }
+    ],
+    "max_checker_wall": 0.23688717199996745
+  }
+]

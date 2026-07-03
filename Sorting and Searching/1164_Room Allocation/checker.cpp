@@ -1,55 +1,73 @@
-#include "testlib.h"
-#include <algorithm>
-#include <vector>
-using namespace std;
+/*
+
+* Problem:      1164 Room Allocation
+* Input read:   n; n customer intervals [arrival, departure]
+* Validity:     Output the optimal number of rooms k from ans, then one room number in [1,k]
+* ```
+            for each customer; customers assigned to the same room must not overlap
+* Optimality:   k must equal the minimum room count from ans
+* Complexity:   O(n log n) time, O(n) memory
+  */
+  #include "testlib.h"
+  #include <bits/stdc++.h>
+  using namespace std;
 
 int main(int argc, char* argv[]) {
-    registerTestlibCmd(argc, argv);
+registerTestlibCmd(argc, argv);
 
-    int n = inf.readInt();
-    vector<pair<int, int>> intervals(n);
-    for (int i = 0; i < n; i++) {
-        int a = inf.readInt();
-        int b = inf.readInt();
-        intervals[i] = {a, b};
-    }
+int n = inf.readInt();
 
-    int k_ans = ans.readInt();
-    int k = ouf.readInt();
-    if (k != k_ans)
-        quitf(_wa, "Minimum rooms is %d, got %d", k_ans, k);
-    ouf.readEoln();
+vector<pair<long long, long long>> intervals(n);
+for (int i = 0; i < n; i++) {
+    long long a = inf.readLong();
+    long long b = inf.readLong();
+    intervals[i] = {a, b};
+}
 
-    vector<int> room(n);
-    for (int i = 0; i < n; i++) {
-        room[i] = ouf.readInt();
-        if (room[i] < 1 || room[i] > k)
-            quitf(_wa, "Room %d for customer %d out of range [1,%d]", room[i], i + 1, k);
-    }
-    if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
+int optimalRooms = ans.readInt();
 
-    vector<vector<int>> by_room(k + 1);
-    for (int i = 0; i < n; i++)
-        by_room[room[i]].push_back(i);
+int k = ouf.readInt(1, n, "number of rooms");
 
-    for (int r = 1; r <= k; r++) {
-        auto& cust = by_room[r];
-        sort(cust.begin(), cust.end(), [&](int i, int j) {
-            if (intervals[i].first != intervals[j].first)
-                return intervals[i].first < intervals[j].first;
-            return intervals[i].second < intervals[j].second;
-        });
-        for (int j = 1; j < (int)cust.size(); j++) {
-            int prev = cust[j - 1];
-            int cur = cust[j];
-            if (intervals[prev].second >= intervals[cur].first)
-                quitf(_wa,
-                      "Customers %d [%d,%d] and %d [%d,%d] overlap in room %d",
-                      prev + 1, intervals[prev].first, intervals[prev].second,
-                      cur + 1, intervals[cur].first, intervals[cur].second, r);
+if (k != optimalRooms) {
+    quitf(_wa, "contestant printed %d rooms, but minimum is %d",
+          k, optimalRooms);
+}
+
+vector<int> room(n);
+vector<vector<int>> byRoom(k + 1);
+
+for (int i = 0; i < n; i++) {
+    room[i] = ouf.readInt(1, k, format("room[%d]", i + 1).c_str());
+    byRoom[room[i]].push_back(i);
+}
+
+for (int r = 1; r <= k; r++) {
+    vector<int>& customers = byRoom[r];
+
+    sort(customers.begin(), customers.end(), [&](int x, int y) {
+        if (intervals[x].first != intervals[y].first) {
+            return intervals[x].first < intervals[y].first;
+        }
+        return intervals[x].second < intervals[y].second;
+    });
+
+    for (int i = 1; i < (int)customers.size(); i++) {
+        int prev = customers[i - 1];
+        int cur = customers[i];
+
+        if (intervals[prev].second >= intervals[cur].first) {
+            quitf(_wa,
+                  "customers %d [%lld,%lld] and %d [%lld,%lld] overlap in room %d",
+                  prev + 1, intervals[prev].first, intervals[prev].second,
+                  cur + 1, intervals[cur].first, intervals[cur].second,
+                  r);
         }
     }
+}
 
-    quitf(_ok, "Valid allocation with %d rooms", k);
+if (!ouf.seekEof())
+    quitf(_wa, "extra information in the output file");
+
+quitf(_ok, "valid allocation with %d rooms", k);
+
 }

@@ -1,78 +1,104 @@
-#include "testlib.h"
-#include <vector>
-using namespace std;
+/*
 
-static void consume_game(int n, InStream& stream) {
-    for (int i = 0; i < n; i++)
-        stream.readInt();
-    for (int i = 0; i < n; i++)
-        stream.readInt();
+* Problem:      3399 Raab Game I
+* Input read:   t; for each test n, a, b
+* Validity:     For each test, NO iff jury says impossible; otherwise YES followed by two
+* ```
+            permutations of 1..n whose score is exactly (a,b)
+* Optimality:   Feasibility is taken from ans; any valid game is accepted
+* Complexity:   O(total n) time, O(n) memory per test
+  */
+  #include "testlib.h"
+  #include <bits/stdc++.h>
+  using namespace std;
+
+static void consume_jury_game(int n) {
+for (int i = 0; i < n; i++) {
+ans.readInt();
+}
+for (int i = 0; i < n; i++) {
+ans.readInt();
+}
 }
 
-static void validate_game(int n, int a, int b) {
-    vector<int> p1(n), p2(n);
-    for (int i = 0; i < n; i++)
-        p1[i] = ouf.readInt();
-    for (int i = 0; i < n; i++)
-        p2[i] = ouf.readInt();
+static vector<int> read_permutation(int n, const string& name) {
+vector<int> p(n);
+vector<char> seen(n + 1, 0);
 
-    vector<bool> seen1(n + 1, false), seen2(n + 1, false);
-    for (int i = 0; i < n; i++) {
-        if (p1[i] < 1 || p1[i] > n)
-            quitf(_wa, "P1[%d]=%d out of range [1,%d]", i + 1, p1[i], n);
-        if (seen1[p1[i]])
-            quitf(_wa, "P1 duplicate value %d", p1[i]);
-        seen1[p1[i]] = true;
+for (int i = 0; i < n; i++) {
+    p[i] = ouf.readInt(1, n, format("%s[%d]", name.c_str(), i + 1).c_str());
 
-        if (p2[i] < 1 || p2[i] > n)
-            quitf(_wa, "P2[%d]=%d out of range [1,%d]", i + 1, p2[i], n);
-        if (seen2[p2[i]])
-            quitf(_wa, "P2 duplicate value %d", p2[i]);
-        seen2[p2[i]] = true;
+    if (seen[p[i]]) {
+        quitf(_wa, "%s has duplicate value %d", name.c_str(), p[i]);
     }
 
-    int s1 = 0, s2 = 0;
-    for (int i = 0; i < n; i++) {
-        if (p1[i] > p2[i])
-            s1++;
-        else if (p1[i] < p2[i])
-            s2++;
-    }
+    seen[p[i]] = 1;
+}
 
-    if (s1 != a || s2 != b)
-        quitf(_wa, "Expected scores (%d,%d) but got (%d,%d)", a, b, s1, s2);
+return p;
+
 }
 
 int main(int argc, char* argv[]) {
-    registerTestlibCmd(argc, argv);
+registerTestlibCmd(argc, argv);
 
-    int t = inf.readInt();
-    for (int tc = 0; tc < t; tc++) {
-        int n = inf.readInt();
-        int a = inf.readInt();
-        int b = inf.readInt();
-        string ans_flag = ans.readToken();
-        string ouf_flag = ouf.readToken();
+int t = inf.readInt();
 
-        if (ans_flag == "NO") {
-            if (ouf_flag != "NO")
-                quitf(_wa, "Test %d: no valid game exists but contestant printed '%s'", tc + 1, ouf_flag.c_str());
-            continue;
-        }
+for (int tc = 1; tc <= t; tc++) {
+    int n = inf.readInt();
+    int a = inf.readInt();
+    int b = inf.readInt();
 
-        if (ans_flag != "YES")
-            quitf(_fail, "Test %d: judge answer malformed, expected YES or NO", tc + 1);
-
-        if (ouf_flag == "NO")
-            quitf(_wa, "Test %d: a valid game exists but contestant printed NO", tc + 1);
-        if (ouf_flag != "YES")
-            quitf(_wa, "Test %d: expected YES or NO, got '%s'", tc + 1, ouf_flag.c_str());
-
-        consume_game(n, ans);
-        validate_game(n, a, b);
+    string ansFlag = ans.readToken();
+    if (ansFlag != "YES" && ansFlag != "NO") {
+        quitf(_fail, "test %d: malformed jury answer token '%s'",
+              tc, compress(ansFlag).c_str());
     }
 
-    if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid for %d test cases", t);
+    if (ansFlag == "YES") {
+        consume_jury_game(n);
+    }
+
+    string outFlag = ouf.readToken();
+    if (outFlag != "YES" && outFlag != "NO") {
+        quitf(_wa, "test %d: expected YES or NO, got '%s'",
+              tc, compress(outFlag).c_str());
+    }
+
+    if (ansFlag == "NO") {
+        if (outFlag != "NO") {
+            quitf(_wa, "test %d: no valid game exists, but contestant printed YES", tc);
+        }
+        continue;
+    }
+
+    if (outFlag == "NO") {
+        quitf(_wa, "test %d: a valid game exists, but contestant printed NO", tc);
+    }
+
+    vector<int> p1 = read_permutation(n, format("test %d player1", tc));
+    vector<int> p2 = read_permutation(n, format("test %d player2", tc));
+
+    int score1 = 0;
+    int score2 = 0;
+
+    for (int i = 0; i < n; i++) {
+        if (p1[i] > p2[i]) {
+            score1++;
+        } else if (p1[i] < p2[i]) {
+            score2++;
+        }
+    }
+
+    if (score1 != a || score2 != b) {
+        quitf(_wa, "test %d: expected scores (%d,%d), but got (%d,%d)",
+              tc, a, b, score1, score2);
+    }
+}
+
+if (!ouf.seekEof())
+    quitf(_wa, "extra information in the output file");
+
+quitf(_ok, "valid output for all %d test cases", t);
+
 }

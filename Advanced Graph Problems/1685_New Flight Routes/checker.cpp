@@ -1,75 +1,125 @@
-#include "testlib.h"
-#include <vector>
-using namespace std;
+/*
 
-void dfs1(int u, const vector<vector<int>>& g, vector<bool>& vis, vector<int>& order) {
-    vis[u] = true;
-    for (int v : g[u])
-        if (!vis[v])
-            dfs1(v, g, vis, order);
-    order.push_back(u);
+* Problem:      1685 New Flight Routes
+* Input read:   n, m; m directed flights
+* Validity:     Output k equal to the optimum from ans, then k directed new flights
+* ```
+            with endpoints in [1,n]; after adding them, the graph must be strongly connected
+* Optimality:   k must equal the minimum number of new flights from ans
+* Complexity:   O(n + m + k) time, O(n + m + k) memory
+  */
+  #include "testlib.h"
+  #include <bits/stdc++.h>
+  using namespace std;
+
+static vector<int> finish_order_iterative(const vector<vector<int>>& g) {
+int n = (int)g.size() - 1;
+vector<char> vis(n + 1, 0);
+vector<int> order;
+order.reserve(n);
+
+for (int start = 1; start <= n; start++) {
+    if (vis[start]) continue;
+
+    vector<pair<int, int>> st;
+    st.push_back({start, 0});
+    vis[start] = 1;
+
+    while (!st.empty()) {
+        int u = st.back().first;
+        int& idx = st.back().second;
+
+        if (idx < (int)g[u].size()) {
+            int v = g[u][idx++];
+            if (!vis[v]) {
+                vis[v] = 1;
+                st.push_back({v, 0});
+            }
+        } else {
+            order.push_back(u);
+            st.pop_back();
+        }
+    }
 }
 
-void dfs2(int u, const vector<vector<int>>& rg, vector<bool>& vis, int& cnt) {
-    vis[u] = true;
-    ++cnt;
-    for (int v : rg[u])
-        if (!vis[v])
-            dfs2(v, rg, vis, cnt);
+return order;
+
+}
+
+static int count_scc(const vector<vector<int>>& g, const vector<vector<int>>& rg) {
+int n = (int)g.size() - 1;
+
+vector<int> order = finish_order_iterative(g);
+vector<char> assigned(n + 1, 0);
+
+int comps = 0;
+
+for (int it = n - 1; it >= 0; it--) {
+    int start = order[it];
+    if (assigned[start]) continue;
+
+    comps++;
+
+    vector<int> st;
+    st.push_back(start);
+    assigned[start] = 1;
+
+    while (!st.empty()) {
+        int u = st.back();
+        st.pop_back();
+
+        for (int v : rg[u]) {
+            if (!assigned[v]) {
+                assigned[v] = 1;
+                st.push_back(v);
+            }
+        }
+    }
+}
+
+return comps;
+
 }
 
 int main(int argc, char* argv[]) {
-    registerTestlibCmd(argc, argv);
+registerTestlibCmd(argc, argv);
 
-    int n = inf.readInt();
-    int m = inf.readInt();
-    vector<vector<int>> g(n + 1), rg(n + 1);
-    for (int i = 0; i < m; i++) {
-        int a = inf.readInt();
-        int b = inf.readInt();
-        g[a].push_back(b);
-        rg[b].push_back(a);
-    }
+int n = inf.readInt();
+int m = inf.readInt();
 
-    int k_ans = ans.readInt();
-    int k = ouf.readInt();
-    if (k != k_ans)
-        quitf(_wa, "Claimed %d new flights but optimal is %d", k, k_ans);
-    if (k < 0)
-        quitf(_wa, "k=%d is negative", k);
+vector<vector<int>> g(n + 1), rg(n + 1);
 
-    for (int i = 0; i < k; i++) {
-        int a = ouf.readInt();
-        int b = ouf.readInt();
-        if (a < 1 || a > n)
-            quitf(_wa, "City %d out of range", a);
-        if (b < 1 || b > n)
-            quitf(_wa, "City %d out of range", b);
-        g[a].push_back(b);
-        rg[b].push_back(a);
-    }
+for (int i = 0; i < m; i++) {
+    int a = inf.readInt();
+    int b = inf.readInt();
+    g[a].push_back(b);
+    rg[b].push_back(a);
+}
 
-    vector<bool> vis(n + 1, false);
-    vector<int> order;
-    for (int i = 1; i <= n; i++)
-        if (!vis[i])
-            dfs1(i, g, vis, order);
+int optimal = ans.readInt();
 
-    fill(vis.begin(), vis.end(), false);
-    int scc = 0;
-    for (int i = (int)order.size() - 1; i >= 0; i--) {
-        int v = order[i];
-        if (!vis[v]) {
-            int cnt = 0;
-            dfs2(v, rg, vis, cnt);
-            if (cnt > 0)
-                ++scc;
-        }
-    }
-    if (scc != 1)
-        quitf(_wa, "Resulting graph has %d SCCs (not strongly connected)", scc);
+int k = ouf.readInt(0, n, "number of new flights");
+if (k != optimal) {
+    quitf(_wa, "contestant printed %d new flights, but optimum is %d", k, optimal);
+}
 
-    if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid minimum solution with %d new flights", k);
+for (int i = 1; i <= k; i++) {
+    int a = ouf.readInt(1, n, format("new_flight[%d].from", i).c_str());
+    int b = ouf.readInt(1, n, format("new_flight[%d].to", i).c_str());
+
+    g[a].push_back(b);
+    rg[b].push_back(a);
+}
+
+int comps = count_scc(g, rg);
+if (comps != 1) {
+    quitf(_wa, "after adding the flights, the graph still has %d strongly connected components",
+          comps);
+}
+
+if (!ouf.seekEof())
+    quitf(_wa, "extra information in the output file");
+
+quitf(_ok, "valid minimum solution with %d new flights", k);
+
 }

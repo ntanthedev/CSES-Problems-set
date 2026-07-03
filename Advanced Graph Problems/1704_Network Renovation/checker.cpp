@@ -1,88 +1,132 @@
-#include "testlib.h"
-#include <vector>
-#include <algorithm>
-using namespace std;
+/*
+
+* Problem:      1704 Network Renovation
+* Input read:   n; n-1 tree edges
+* Validity:     Output k new non-self connections; after adding them, the graph must have no bridges
+* Optimality:   k must equal the minimum number of new connections from ans
+* Complexity:   O(n + k) time, O(n + k) memory
+  */
+  #include "testlib.h"
+  #include <bits/stdc++.h>
+  using namespace std;
 
 struct BridgeChecker {
-    vector<vector<int>> g;
-    vector<pair<int, int>> edges;
-    vector<int> tin, low;
+vector<vector<int>> incident;
+vector<pair<int, int>> edges;
+
+explicit BridgeChecker(int n = 0) {
+    incident.assign(n + 1, {});
+}
+
+void add_edge(int a, int b) {
+    int id = (int)edges.size();
+    edges.push_back({a, b});
+    incident[a].push_back(id);
+    incident[b].push_back(id);
+}
+
+int other(int u, int edgeId) const {
+    return edges[edgeId].first ^ edges[edgeId].second ^ u;
+}
+
+bool has_bridge(int n) const {
+    vector<int> tin(n + 1, 0), low(n + 1, 0), parent(n + 1, -1), parentEdge(n + 1, -1);
+    vector<int> iter(n + 1, 0);
+
     int timer = 0;
-    bool has_bridge = false;
+    bool foundBridge = false;
 
-    void add_edge(int a, int b) {
-        int id = (int)edges.size();
-        edges.push_back({a, b});
-        g[a].push_back(id);
-        g[b].push_back(id);
-    }
+    for (int root = 1; root <= n; root++) {
+        if (tin[root]) continue;
 
-    int other(int u, int ei) const {
-        return edges[ei].first ^ edges[ei].second ^ u;
-    }
+        parent[root] = 0;
 
-    void dfs(int u, int pe) {
-        tin[u] = low[u] = ++timer;
-        for (int ei : g[u]) {
-            if (ei == pe)
-                continue;
-            int v = other(u, ei);
-            if (tin[v]) {
-                low[u] = min(low[u], tin[v]);
+        vector<int> st;
+        st.push_back(root);
+
+        while (!st.empty()) {
+            int u = st.back();
+
+            if (!tin[u]) {
+                tin[u] = low[u] = ++timer;
+            }
+
+            if (iter[u] < (int)incident[u].size()) {
+                int edgeId = incident[u][iter[u]++];
+
+                if (edgeId == parentEdge[u]) {
+                    continue;
+                }
+
+                int v = other(u, edgeId);
+
+                if (!tin[v]) {
+                    parent[v] = u;
+                    parentEdge[v] = edgeId;
+                    st.push_back(v);
+                } else {
+                    low[u] = min(low[u], tin[v]);
+                }
             } else {
-                dfs(v, ei);
-                low[u] = min(low[u], low[v]);
-                if (low[v] > tin[u])
-                    has_bridge = true;
+                st.pop_back();
+
+                if (parent[u] != 0) {
+                    int p = parent[u];
+
+                    if (low[u] > tin[p]) {
+                        foundBridge = true;
+                    }
+
+                    low[p] = min(low[p], low[u]);
+                }
             }
         }
     }
 
-    void run(int n) {
-        tin.assign(n + 1, 0);
-        low.assign(n + 1, 0);
-        timer = 0;
-        has_bridge = false;
-        dfs(1, -1);
-    }
+    return foundBridge;
+}
+
 };
 
 int main(int argc, char* argv[]) {
-    registerTestlibCmd(argc, argv);
+registerTestlibCmd(argc, argv);
 
-    int n = inf.readInt();
-    BridgeChecker bc;
-    bc.g.assign(n + 1, {});
-    for (int i = 0; i < n - 1; i++) {
-        int a = inf.readInt();
-        int b = inf.readInt();
-        bc.add_edge(a, b);
+int n = inf.readInt();
+
+BridgeChecker checker(n);
+
+for (int i = 0; i < n - 1; i++) {
+    int a = inf.readInt();
+    int b = inf.readInt();
+
+    checker.add_edge(a, b);
+}
+
+int optimal = ans.readInt();
+
+int k = ouf.readInt(0, n, "number of new connections");
+if (k != optimal) {
+    quitf(_wa, "contestant printed %d new connections, but optimum is %d", k, optimal);
+}
+
+for (int i = 1; i <= k; i++) {
+    int a = ouf.readInt(1, n, format("connection[%d].a", i).c_str());
+    int b = ouf.readInt(1, n, format("connection[%d].b", i).c_str());
+
+    if (a == b) {
+        quitf(_wa, "connection %d is a self-loop at computer %d", i, a);
     }
 
-    int k_ans = ans.readInt();
-    int k = ouf.readInt();
-    if (k != k_ans)
-        quitf(_wa, "Claimed %d new connections but optimal is %d", k, k_ans);
-    if (k < 0)
-        quitf(_wa, "k=%d is negative", k);
+    checker.add_edge(a, b);
+}
 
-    for (int i = 0; i < k; i++) {
-        int a = ouf.readInt();
-        int b = ouf.readInt();
-        if (a < 1 || a > n)
-            quitf(_wa, "Computer %d out of range", a);
-        if (b < 1 || b > n)
-            quitf(_wa, "Computer %d out of range", b);
-        if (a == b)
-            quitf(_wa, "Cannot connect a computer to itself");
-        bc.add_edge(a, b);
-    }
+if (checker.has_bridge(n)) {
+    quitf(_wa, "graph still has a bridge after adding the new connections");
+}
 
-    bc.run(n);
-    if (bc.has_bridge)
-        quitf(_wa, "Graph still has bridges after adding new connections");
+if (!ouf.seekEof())
+    quitf(_wa, "extra information in the output file");
 
-    if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid minimum solution with %d new connections", k);
+quitf(_ok, "valid minimum solution with %d new connections", k);
+
 }

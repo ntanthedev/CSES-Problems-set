@@ -1,47 +1,78 @@
-#include "testlib.h"
-#include <vector>
-using namespace std;
+/*
+
+* Problem:      2129 Task Assignment
+* Input read:   n; n x n cost matrix
+* Validity:     Output optimal total cost and n assignment pairs. Every employee and every
+* ```
+            task must appear exactly once, and the assignment cost must match the claim
+* Optimality:   Claimed total cost must equal the minimum cost from ans
+* Complexity:   O(n^2) time, O(n^2) memory
+  */
+  #include "testlib.h"
+  #include <bits/stdc++.h>
+  using namespace std;
 
 int main(int argc, char* argv[]) {
-    registerTestlibCmd(argc, argv);
+registerTestlibCmd(argc, argv);
 
-    int n = inf.readInt();
-    vector<vector<int>> cost(n, vector<int>(n));
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++)
-            cost[i][j] = inf.readInt();
+int n = inf.readInt();
+
+vector<vector<int>> cost(n + 1, vector<int>(n + 1));
+for (int i = 1; i <= n; i++) {
+    for (int j = 1; j <= n; j++) {
+        cost[i][j] = inf.readInt();
+    }
+}
+
+int optimal = ans.readInt();
+
+int claimed = ouf.readInt(0, n * 1000, "minimum total cost");
+
+if (claimed != optimal) {
+    quitf(_wa, "contestant claimed total cost %d, but optimum is %d",
+          claimed, optimal);
+}
+
+vector<char> usedEmployee(n + 1, 0);
+vector<char> usedTask(n + 1, 0);
+
+long long total = 0;
+
+for (int i = 1; i <= n; i++) {
+    int employee = ouf.readInt(1, n, format("assignment[%d].employee", i).c_str());
+    int task = ouf.readInt(1, n, format("assignment[%d].task", i).c_str());
+
+    if (usedEmployee[employee]) {
+        quitf(_wa, "employee %d is assigned more than once", employee);
     }
 
-    long long optimal = ans.readInt();
-    int claimed_cost = ouf.readInt();
-    if ((long long)claimed_cost != optimal)
-        quitf(_wa, "Minimum total cost is %lld, got %d", optimal, claimed_cost);
-
-    vector<int> emp_of_task(n, 0);
-    vector<int> task_of_emp(n, 0);
-    long long total = 0;
-
-    for (int i = 0; i < n; i++) {
-        int a = ouf.readInt();
-        int b = ouf.readInt();
-        if (a < 1 || a > n)
-            quitf(_wa, "Employee %d out of range", a);
-        if (b < 1 || b > n)
-            quitf(_wa, "Task %d out of range", b);
-        if (task_of_emp[a - 1] != 0)
-            quitf(_wa, "Employee %d assigned more than one task", a);
-        if (emp_of_task[b - 1] != 0)
-            quitf(_wa, "Task %d assigned to more than one employee", b);
-        task_of_emp[a - 1] = b;
-        emp_of_task[b - 1] = a;
-        total += cost[a - 1][b - 1];
+    if (usedTask[task]) {
+        quitf(_wa, "task %d is assigned more than once", task);
     }
 
-    if (total != optimal)
-        quitf(_wa, "Claimed total cost %d, but actual sum of assignments is %lld",
-              claimed_cost, total);
+    usedEmployee[employee] = 1;
+    usedTask[task] = 1;
+    total += cost[employee][task];
+}
 
-    if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid optimal assignment with total cost %lld", total);
+for (int i = 1; i <= n; i++) {
+    if (!usedEmployee[i]) {
+        quitf(_wa, "employee %d is not assigned any task", i);
+    }
+
+    if (!usedTask[i]) {
+        quitf(_wa, "task %d is not assigned to any employee", i);
+    }
+}
+
+if (total != claimed) {
+    quitf(_wa, "claimed total cost is %d, but actual assignment cost is %lld",
+          claimed, total);
+}
+
+if (!ouf.seekEof())
+    quitf(_wa, "extra information in the output file");
+
+quitf(_ok, "valid optimal assignment with total cost %lld", total);
+
 }

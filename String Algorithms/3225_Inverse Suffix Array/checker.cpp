@@ -1,100 +1,148 @@
-#include "testlib.h"
-#include <string>
-#include <vector>
-using namespace std;
+/*
 
-struct RollingHash {
-    static const long long base = 911382323;
-    static const long long mod = 1000000007;
-    vector<long long> pw, h;
+* Problem:      3225 Inverse Suffix Array
+* Input read:   n; suffix array sa[1..n]
+* Validity:     -1 iff jury says impossible; otherwise output a lowercase string of length n
+* ```
+            whose suffix array exactly matches the input permutation
+* Optimality:   Feasibility is taken from ans; any valid string is accepted
+* Complexity:   O(n log n) time, O(n) memory
+  */
+  #include "testlib.h"
+  #include <bits/stdc++.h>
+  using namespace std;
 
-    RollingHash(const string& s) {
-        int n = (int)s.size();
-        pw.resize(n + 1);
-        h.resize(n + 1);
-        pw[0] = 1;
-        for (int i = 0; i < n; i++) {
-            pw[i + 1] = pw[i] * base % mod;
-            h[i + 1] = (h[i] * base + s[i]) % mod;
-        }
-    }
+static vector<int> build_suffix_array(const string& original) {
+string s = original;
+s.push_back(char(0));
 
-    long long get(int l, int r) const {
-        return (h[r] - h[l] * pw[r - l] % mod + mod) % mod;
-    }
-};
+int n = (int)s.size();
+const int ALPHA = 256;
 
-bool suffix_less(const string& s, const RollingHash& rh, int i, int j) {
-    int ni = (int)s.size() - i;
-    int nj = (int)s.size() - j;
-    int lo = 0, hi = min(ni, nj);
-    while (lo < hi) {
-        int mid = (lo + hi + 1) / 2;
-        if (rh.get(i, i + mid) == rh.get(j, j + mid))
-            lo = mid;
-        else
-            hi = mid - 1;
-    }
-    if (lo == ni && lo == nj) return false;
-    if (lo == ni) return true;
-    if (lo == nj) return false;
-    return s[i + lo] < s[j + lo];
+vector<int> p(n), c(n);
+vector<int> cnt(max(ALPHA, n), 0);
+
+for (int i = 0; i < n; i++) {
+    cnt[(unsigned char)s[i]]++;
+}
+for (int i = 1; i < ALPHA; i++) {
+    cnt[i] += cnt[i - 1];
+}
+for (int i = 0; i < n; i++) {
+    p[--cnt[(unsigned char)s[i]]] = i;
 }
 
-bool valid_suffix_array(const string& s, const vector<int>& sa) {
-    int n = (int)sa.size();
-    vector<int> seen(n + 1, 0);
+c[p[0]] = 0;
+int classes = 1;
+for (int i = 1; i < n; i++) {
+    if (s[p[i]] != s[p[i - 1]]) classes++;
+    c[p[i]] = classes - 1;
+}
+
+vector<int> pn(n), cn(n);
+
+for (int h = 0; (1 << h) < n; h++) {
+    int shift = 1 << h;
+
     for (int i = 0; i < n; i++) {
-        if (sa[i] < 1 || sa[i] > n) return false;
-        if (seen[sa[i]]) return false;
-        seen[sa[i]] = 1;
+        pn[i] = p[i] - shift;
+        if (pn[i] < 0) pn[i] += n;
     }
 
-    RollingHash rh(s);
-    for (int i = 0; i + 1 < n; i++) {
-        int a = sa[i] - 1;
-        int b = sa[i + 1] - 1;
-        if (!suffix_less(s, rh, a, b))
-            return false;
+    fill(cnt.begin(), cnt.begin() + classes, 0);
+    for (int i = 0; i < n; i++) {
+        cnt[c[pn[i]]]++;
     }
-    return true;
+    for (int i = 1; i < classes; i++) {
+        cnt[i] += cnt[i - 1];
+    }
+    for (int i = n - 1; i >= 0; i--) {
+        int x = pn[i];
+        p[--cnt[c[x]]] = x;
+    }
+
+    cn[p[0]] = 0;
+    int newClasses = 1;
+
+    for (int i = 1; i < n; i++) {
+        pair<int, int> cur = {c[p[i]], c[(p[i] + shift) % n]};
+        pair<int, int> prev = {c[p[i - 1]], c[(p[i - 1] + shift) % n]};
+
+        if (cur != prev) newClasses++;
+        cn[p[i]] = newClasses - 1;
+    }
+
+    c.swap(cn);
+    classes = newClasses;
+}
+
+vector<int> sa;
+sa.reserve(n - 1);
+
+for (int i = 1; i < n; i++) {
+    sa.push_back(p[i]);
+}
+
+return sa;
+
 }
 
 int main(int argc, char* argv[]) {
-    registerTestlibCmd(argc, argv);
+registerTestlibCmd(argc, argv);
 
-    int n = inf.readInt();
-    vector<int> given(n);
-    for (int i = 0; i < n; i++)
-        given[i] = inf.readInt();
+int n = inf.readInt();
 
-    string ref = ans.readToken();
-    string first = ouf.readToken();
+vector<int> given(n);
+for (int i = 0; i < n; i++) {
+    given[i] = inf.readInt();
+}
 
-    if (ref == "-1") {
-        if (first != "-1")
-            quitf(_wa, "No string corresponds to this suffix array");
-        if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: impossible suffix array");
+string ref = ans.readToken();
+
+if (ref == "-1") {
+    string out = ouf.readToken();
+
+    if (out != "-1") {
+        quitf(_wa, "jury answer is -1, but contestant printed '%s'",
+              compress(out).c_str());
     }
-
-    if (first == "-1")
-        quitf(_wa, "A valid string exists for this suffix array");
-
-    string out = first;
-    if ((int)out.size() != n)
-        quitf(_wa, "String length is %d, expected %d", (int)out.size(), n);
-
-    for (char c : out) {
-        if (c < 'a' || c > 'z')
-            quitf(_wa, "Output contains invalid character '%c'", c);
-    }
-
-    if (!valid_suffix_array(out, given))
-        quitf(_wa, "Suffix array of output does not match input");
 
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-    quitf(_ok, "Valid string for suffix array");
+        quitf(_wa, "extra information in the output file");
+
+    quitf(_ok, "correctly reported -1");
+}
+
+string out = ouf.readToken();
+
+if (out == "-1") {
+    quitf(_wa, "a valid string exists, but contestant printed -1");
+}
+
+if ((int)out.size() != n) {
+    quitf(_wa, "output string length is %d, expected %d", (int)out.size(), n);
+}
+
+for (int i = 0; i < n; i++) {
+    if (out[i] < 'a' || out[i] > 'z') {
+        quitf(_wa, "output contains invalid character '%c' at position %d",
+              out[i], i + 1);
+    }
+}
+
+vector<int> actual = build_suffix_array(out);
+
+for (int i = 0; i < n; i++) {
+    int pos = actual[i] + 1;
+    if (pos != given[i]) {
+        quitf(_wa, "suffix array mismatch at position %d: got %d, expected %d",
+              i + 1, pos, given[i]);
+    }
+}
+
+if (!ouf.seekEof())
+    quitf(_wa, "extra information in the output file");
+
+quitf(_ok, "valid string for the given suffix array");
+
 }

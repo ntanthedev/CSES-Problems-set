@@ -24,8 +24,7 @@
   },
   "1134": {
     "checker": "bridged",
-    "checker_type": "testlib",
-    "checker_file": "checker_unordered_pairs_symmetric.cpp"
+    "checker_type": "testlib"
   },
   "1164": {
     "checker": "bridged",
@@ -311,10 +310,8 @@
     "checker_type": "testlib"
   },
   "3361": {
-    "checker": "floats",
-    "checker_args": {
-      "precision": 6
-    }
+    "checker": "bridged",
+    "checker_type": "testlib"
   },
   "3399": {
     "checker": "bridged",

@@ -1,44 +1,59 @@
-#include "testlib.h"
-#include <vector>
-using namespace std;
+/*
+
+* Problem:      1640 Sum of Two Values
+* Input read:   n, x; array a[1..n]
+* Validity:     IMPOSSIBLE iff jury says no pair; otherwise two distinct positions in [1,n]
+* ```
+            whose values sum to x
+* Optimality:   Feasibility is taken from ans; any valid pair is accepted
+* Complexity:   O(n) time, O(n) memory
+  */
+  #include "testlib.h"
+  #include <bits/stdc++.h>
+  using namespace std;
 
 int main(int argc, char* argv[]) {
-    registerTestlibCmd(argc, argv);
+registerTestlibCmd(argc, argv);
 
-    int n = inf.readInt();
-    int x = inf.readInt();
-    vector<int> a(n);
-    for (int i = 0; i < n; i++)
-        a[i] = inf.readInt();
-    string ans_first = ans.readToken();
-    string ouf_first = ouf.readToken();
+int n = inf.readInt();
+long long x = inf.readLong();
 
-    if (ans_first == "IMPOSSIBLE") {
-        if (ouf_first != "IMPOSSIBLE")
-            quitf(_wa, "No valid pair exists but contestant printed '%s'", ouf_first.c_str());
-        if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
-        quitf(_ok, "Correct: no pair");
+vector<long long> a(n + 1);
+for (int i = 1; i <= n; i++) {
+    a[i] = inf.readLong();
+}
+
+string ansFirst = ans.readToken();
+
+if (ansFirst == "IMPOSSIBLE") {
+    string outFirst = ouf.readToken();
+    if (outFirst != "IMPOSSIBLE") {
+        quitf(_wa, "jury answer is IMPOSSIBLE but contestant printed '%s'",
+              compress(outFirst).c_str());
     }
 
-    if (ouf_first == "IMPOSSIBLE")
-        quitf(_wa, "A valid pair exists but contestant printed IMPOSSIBLE");
-
-    int i = stoi(ouf_first);
-    int j = ouf.readInt();
-    ouf.readEoln();
     if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
+        quitf(_wa, "extra information in the output file");
 
-    if (i < 1 || i > n)
-        quitf(_wa, "First position %d out of range [1,%d]", i, n);
-    if (j < 1 || j > n)
-        quitf(_wa, "Second position %d out of range [1,%d]", j, n);
-    if (i == j)
-        quitf(_wa, "Positions must be distinct, got %d and %d", i, j);
-    if ((long long)a[i - 1] + a[j - 1] != x)
-        quitf(_wa, "Values at positions %d and %d sum to %lld, expected %d",
-              i, j, (long long)a[i - 1] + a[j - 1], x);
+    quitf(_ok, "correctly reported IMPOSSIBLE");
+}
 
-    quitf(_ok, "Valid pair (%d, %d)", i, j);
+int i = ouf.readInt(1, n, "first position");
+int j = ouf.readInt(1, n, "second position");
+
+if (i == j) {
+    quitf(_wa, "positions must be distinct, both are %d", i);
+}
+
+long long sum = a[i] + a[j];
+if (sum != x) {
+    quitf(_wa, "values at positions %d and %d sum to %lld, expected %lld",
+          i, j, sum, x);
+}
+
+if (!ouf.seekEof())
+    quitf(_wa, "extra information in the output file");
+
+quitf(_ok, "valid pair (%d, %d)", i, j);
+
 }

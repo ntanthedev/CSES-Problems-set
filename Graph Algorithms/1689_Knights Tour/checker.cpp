@@ -1,52 +1,72 @@
-#include "testlib.h"
-#include <vector>
-using namespace std;
+/*
+
+* Problem:      1689 Knights Tour
+* Input read:   starting position x, y
+* Validity:     Output an 8x8 grid containing each number 1..64 exactly once; number 1
+* ```
+            must be at the requested start square, and consecutive numbers must be
+* ```
+            legal knight moves
+* Optimality:   Any valid knight tour is accepted
+* Complexity:   O(1) time and memory
+  */
+  #include "testlib.h"
+  #include <bits/stdc++.h>
+  using namespace std;
+
+static bool is_knight_move(pair<int, int> a, pair<int, int> b) {
+int dr = abs(a.first - b.first);
+int dc = abs(a.second - b.second);
+
+return (dr == 1 && dc == 2) || (dr == 2 && dc == 1);
+
+}
 
 int main(int argc, char* argv[]) {
-    registerTestlibCmd(argc, argv);
+registerTestlibCmd(argc, argv);
 
-    int x = inf.readInt();
-    int y = inf.readInt();
-    vector<vector<int>> grid(8, vector<int>(8));
-    for (int r = 0; r < 8; r++) {
-        for (int c = 0; c < 8; c++) {
-            grid[r][c] = ouf.readInt();
-            if (grid[r][c] < 1 || grid[r][c] > 64)
-                quitf(_wa, "Grid value %d out of range [1,64] at (%d,%d)", grid[r][c], r + 1, c + 1);
+int x = inf.readInt();
+int y = inf.readInt();
+
+vector<pair<int, int>> pos(65, {-1, -1});
+vector<char> seen(65, 0);
+
+for (int row = 1; row <= 8; row++) {
+    for (int col = 1; col <= 8; col++) {
+        int value = ouf.readInt(1, 64, format("board[%d][%d]", row, col).c_str());
+
+        if (seen[value]) {
+            quitf(_wa, "number %d appears more than once", value);
         }
+
+        seen[value] = 1;
+        pos[value] = {row, col};
     }
-    if (!ouf.seekEof())
-        quitf(_wa, "Extra information in the output file");
+}
 
-    vector<bool> seen(65, false);
-    for (int r = 0; r < 8; r++) {
-        for (int c = 0; c < 8; c++) {
-            int val = grid[r][c];
-            if (seen[val])
-                quitf(_wa, "Number %d appears more than once", val);
-            seen[val] = true;
-        }
+for (int value = 1; value <= 64; value++) {
+    if (!seen[value]) {
+        quitf(_wa, "number %d is missing from the board", value);
     }
+}
 
-    vector<pair<int, int>> pos(65);
-    for (int r = 0; r < 8; r++) {
-        for (int c = 0; c < 8; c++)
-            pos[grid[r][c]] = {r, c};
+if (pos[1] != make_pair(y, x)) {
+    quitf(_wa, "tour starts at row %d column %d, expected row %d column %d",
+          pos[1].first, pos[1].second, y, x);
+}
+
+for (int value = 1; value < 64; value++) {
+    if (!is_knight_move(pos[value], pos[value + 1])) {
+        quitf(_wa,
+              "move from %d at row %d column %d to %d at row %d column %d is not a knight move",
+              value, pos[value].first, pos[value].second,
+              value + 1, pos[value + 1].first, pos[value + 1].second);
     }
+}
 
-    if (pos[1].first != y - 1 || pos[1].second != x - 1)
-        quitf(_wa, "Starting position must be (%d,%d), got (%d,%d)",
-              x, y, pos[1].second + 1, pos[1].first + 1);
+if (!ouf.seekEof())
+    quitf(_wa, "extra information in the output file");
 
-    for (int step = 1; step < 64; step++) {
-        int r1 = pos[step].first, c1 = pos[step].second;
-        int r2 = pos[step + 1].first, c2 = pos[step + 1].second;
-        int dr = abs(r1 - r2), dc = abs(c1 - c2);
-        if (!((dr == 2 && dc == 1) || (dr == 1 && dc == 2)))
-            quitf(_wa,
-                  "Move from step %d to %d ((%d,%d) to (%d,%d)) is not a valid knight move",
-                  step, step + 1, c1 + 1, r1 + 1, c2 + 1, r2 + 1);
-    }
+quitf(_ok, "valid knight tour");
 
-    quitf(_ok, "Valid knight's tour");
 }
