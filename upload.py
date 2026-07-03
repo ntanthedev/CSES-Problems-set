@@ -244,6 +244,32 @@ def read_cases(zip_path):
     return cases, set(names)
 
 
+
+
+def parse_admin_datetime(value, default_time='00:00:00'):
+    """Parse a user-supplied publish datetime for Django admin widgets.
+
+    Accepts YYYY-MM-DD or YYYY-MM-DD HH:MM[:SS], returns (date, time).
+    """
+    value = (value or '').strip()
+    m = re.match(r'^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2})(?::(\d{2}))?)?$', value)
+    if not m:
+        raise SystemExit('Bad date/datetime %r — use YYYY-MM-DD or "YYYY-MM-DD HH:MM"' % value)
+    d = m.group(1)
+    if m.group(2):
+        return d, '%s:%s' % (m.group(2), m.group(3) or '00')
+    return d, default_time
+
+
+def fill_datetime_payload(items, form, field, value, default_time='00:00:00'):
+    """Fill either Django admin SplitDateTimeWidget (field_0/_1) or a combined field."""
+    d, t = parse_admin_datetime(value, default_time=default_time)
+    if form.find(attrs={'name': field + '_0'}) is not None:
+        items_set(items, field + '_0', d)
+        items_set(items, field + '_1', t)
+    else:
+        items_set(items, field, '%s %s' % (d, t))
+
 # --------------------------------------------------------------------------- #
 # Checker manifest: CHECKER_MANIFEST.json at the repo root, keyed by CSES id.
 # --------------------------------------------------------------------------- #
@@ -989,6 +1015,81 @@ class Uploader:
                            allow_redirects=False, timeout=120)
         return resp.status_code in (200, 301, 302), len(pks)
 
+    def list_admin_problem_codes(self, prefix):
+        """Return all editable problem codes matching a prefix from the admin changelist.
+
+        CHT-OJ's ProblemAdmin has list_max_show_all = 1000, and CSES has ~400
+        problems, so ?all= is enough for the full cses_ batch. We still filter
+        exact code prefixes after parsing to avoid accidental search matches.
+        """
+        path = '/admin/judge/problem/?q=%s&all=' % quote(prefix)
+        r, soup = self._get_soup(path)
+        rx = re.compile(r'/admin/judge/problem/(\d+)/change/')
+        out = []
+        seen = set()
+        for a in soup.find_all('a', href=rx):
+            code = a.get_text(strip=True)
+            if not code or not code.startswith(prefix) or code in seen:
+                continue
+            m = rx.search(a['href'])
+            if not m:
+                continue
+            out.append((code, m.group(1)))
+            seen.add(code)
+        return out
+
+    def set_problem_publish_date(self, code, publish_date, make_public=True):
+        """Set Problem.date through the Django admin change form without touching test data.
+
+        This is intentionally separate from the changelist publish action because
+        CHT-OJ's built-in action always sets date=timezone.now(); it cannot accept
+        an arbitrary date.
+        """
+        pk = self.admin_problem_pk(code)
+        if not pk:
+            raise RuntimeError('could not find admin pk for %s' % code)
+        path = '/admin/judge/problem/%s/change/' % pk
+        r, soup = self._get_soup(path)
+        form = form_containing(soup, 'code') or soup.find('form')
+        if form is None:
+            if self.debug:
+                self._diagnose('admin_problem_change', r, soup)
+            raise RuntimeError('could not open admin change form for %s' % code)
+
+        items = form_payload_multi(form)
+        items_set(items, 'csrfmiddlewaretoken', self._csrf(soup))
+
+        # Set visibility if the account can edit this field. Superuser/admin should.
+        if form.find(attrs={'name': 'is_public'}) is not None:
+            items_del(items, 'is_public')
+            if make_public:
+                items_set(items, 'is_public', 'on')
+        elif make_public:
+            raise RuntimeError('admin form for %s has no editable is_public field; missing permission?' % code)
+
+        if form.find(attrs={'name': 'date_0'}) is not None or form.find(attrs={'name': 'date'}) is not None:
+            fill_datetime_payload(items, form, 'date', publish_date)
+        else:
+            raise RuntimeError('admin form for %s has no editable date field; missing permission?' % code)
+
+        # Save the admin form; preserve all inline management forms and multi-selects.
+        items.append(('_save', 'Save'))
+        resp = self.s.post(self.url(path), data=items,
+                           headers={'Referer': self.url(path)},
+                           allow_redirects=False, timeout=180)
+        if resp.status_code in (301, 302):
+            return True
+        if self.debug:
+            self._diagnose('admin_problem_change_post', resp, BeautifulSoup(resp.text, _PARSER))
+        raise RuntimeError('set publish date failed for %s: %s' % (code, show_errors(resp.text)))
+
+    def set_problem_publish_dates(self, codes, publish_date, make_public=True):
+        ok = 0
+        for code in codes:
+            self.set_problem_publish_date(code, publish_date, make_public=make_public)
+            ok += 1
+        return ok
+
     # backward-compatible alias used by the end-of-run auto-publish
     def publish_prefix(self, prefix):
         return self.set_public_prefix(prefix, make_public=True)
@@ -1045,6 +1146,11 @@ def main():
     ap.add_argument('--unpublish-only', action='store_true',
                     help='Do nothing but UNPUBLISH (make private) the cses_* problems, then exit. '
                          'Use --only to target a specific subset.')
+    ap.add_argument('--set-publish-date', metavar='DATE',
+                    help='Admin-only: set Problem.date to DATE for already-uploaded problems without uploading test data. '
+                         'DATE is YYYY-MM-DD or "YYYY-MM-DD HH:MM". Uses --only if provided, otherwise all code-prefix matches.')
+    ap.add_argument('--skip-test-data', action='store_true',
+                    help='With --overwrite, update statement/limits/editorial but do NOT re-upload test data.')
     ap.add_argument('--overwrite', action='store_true', help='Re-upload data for problems that already exist.')
     ap.add_argument('--with-editorial', action='store_true',
                     help='Also upload analysis_<lang>.md as the problem editorial (Solution).')
@@ -1094,7 +1200,7 @@ def main():
         return
 
     # ---- dry run: just validate local files ----
-    if opt.dry_run:
+    if opt.dry_run and not opt.set_publish_date:
         ok = bad = 0
         for pid, name, cat, pdir, st, zp in iter_problems(opt.root, opt.lang, only):
             if not st or not zp:
@@ -1131,6 +1237,33 @@ def main():
     print('Logging in as %s ...' % opt.user)
     up.login(opt.user, password)
     print('  OK\n')
+
+    # ---- publish-date-only mode: set arbitrary Problem.date without touching test data ----
+    if opt.set_publish_date:
+        try:
+            if only:
+                codes = [opt.code_prefix + i if re.fullmatch(r'\d+', i) else i for i in sorted(only)]
+            else:
+                found_codes = up.list_admin_problem_codes(opt.code_prefix)
+                codes = [code for code, pk in found_codes]
+            if not codes:
+                print('  FAILED: no matching problems found.')
+                return
+            print('Setting publish date for %d problem(s) to %s ...' % (len(codes), opt.set_publish_date))
+            if opt.dry_run:
+                for code in codes[:30]:
+                    print('  would update %s' % code)
+                if len(codes) > 30:
+                    print('  ... and %d more' % (len(codes) - 30))
+                print('  --dry-run: no POST sent.')
+                return
+            n = up.set_problem_publish_dates(codes, opt.set_publish_date, make_public=True)
+            print('  done (%d problems). No test data was uploaded.' % n)
+        except Exception as e:
+            print('  FAILED: %s' % e)
+            if opt.debug:
+                traceback.print_exc()
+        return
 
     # ---- publish/unpublish-only modes: just flip visibility, then exit ----
     if opt.publish_only or opt.unpublish_only:
@@ -1195,11 +1328,13 @@ def main():
                                   opt.default_type)
                 print('[%s] %s -> updated statement/limits' % (pid, name))
 
-            if not exists or opt.overwrite:
+            if (not exists or opt.overwrite) and not opt.skip_test_data:
                 checker_spec = manifest.get(pid)
                 up.upload_data(code, zp, cases, checker_spec=checker_spec, pdir=pdir)
                 extra = ' [checker=%s]' % checker_spec['checker'] if checker_spec else ''
                 print('       uploaded %d test cases (%.2fs, %dKB)%s' % (len(cases), tl, mem, extra))
+            elif opt.skip_test_data and (not exists or opt.overwrite):
+                print('       skipped test data upload (--skip-test-data)')
 
             if opt.with_editorial:
                 an = None

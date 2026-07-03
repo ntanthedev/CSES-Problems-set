@@ -42,15 +42,19 @@ VÍ DỤ
     python contest_tool.py set-visible --user ntannn --key luyentap01
     python contest_tool.py set-hidden  --user ntannn --key luyentap01
 
+    # 5. bật rating cho contest
+    python contest_tool.py set-rated --user ntannn --key luyentap01 --rate-all
+    python contest_tool.py set-unrated --user ntannn --key luyentap01
+
 GHI CHÚ
   * --problems nhận CSES id trần (1068 -> cses_1068 theo --code-prefix) hoặc
     code đầy đủ (vd. abc_xyz) — cái nào có sẵn trên OJ thì dùng.
   * Bài phải tồn tại trên OJ trước (upload.py lo phần đó).
   * Trường `authors` được tự điền bằng profile của chính --user (form admin
     thường bắt buộc >= 1 author).
-  * Format contest, rated, access code... để mặc định của form; chỉnh sau
-    trong admin UI nếu cần (hoặc mở rộng tool — mọi field đều đi qua đúng
-    một chỗ: build_create_payload()).
+  * Format contest được set tường minh bằng --format. Rating có thể bật
+    ngay khi tạo bằng --rated/--rate-all, hoặc bật/tắt sau bằng set-rated /
+    set-unrated. Các field khác vẫn giữ nguyên default của form admin.
 """
 import argparse
 import getpass
@@ -176,6 +180,29 @@ def inline_row_template(form, prefix):
                 tmpl[suffix] = el.get('value', '')
     return tmpl
 
+
+
+def normalize_key_suggestion(key):
+    """Return a safe-looking contest key suggestion for CHT-OJ.
+
+    CHT-OJ Contest.key is constrained by the model validator to
+    ^[a-z0-9_]+$ and max_length=32. Hyphens are NOT accepted.
+    """
+    sug = key.strip().lower()
+    sug = re.sub(r'[^a-z0-9_]+', '_', sug)
+    sug = re.sub(r'_+', '_', sug).strip('_')
+    return sug[:32]
+
+
+def validate_contest_key(key):
+    if not re.fullmatch(r'[a-z0-9_]+', key or ''):
+        sug = normalize_key_suggestion(key or '')
+        msg = 'Contest key không hợp lệ: %r. CHT-OJ chỉ cho phép regex ^[a-z0-9_]+$ (chữ thường, số, dấu gạch dưới; KHÔNG dùng dấu gạch ngang).'
+        if sug and sug != key:
+            msg += ' Gợi ý: --key %s' % sug
+        raise SystemExit(msg % key)
+    if len(key) > 32:
+        raise SystemExit('Contest key quá dài: %d ký tự; CHT-OJ Contest.key max_length=32. Gợi ý: --key %s' % (len(key), key[:32]))
 
 def parse_dt(s):
     """'YYYY-MM-DD HH:MM[:SS]' -> ('YYYY-MM-DD', 'HH:MM:SS')"""
@@ -444,6 +471,51 @@ def sanity_check_problem_rows(items, prefix, pk_pairs, start_index, partial=Fals
             raise SystemExit('payload lỗi: CSES binary nhưng vẫn gửi %spartial' % base)
 
 
+def apply_rating_options(items, form, rated=None, rate_all=None, rating_floor=None, rating_ceiling=None,
+                         clear_rating_bounds=False, require_fields=False):
+    """Apply CHT-OJ Contest rating fields to an admin form payload.
+
+    Checkbox semantics: checked => include field with value "on"; unchecked =>
+    omit field entirely. This preserves unrelated rating M2M fields such as
+    rate_exclude because we only touch explicitly requested scalar fields.
+    """
+    if require_fields and form.find(attrs={'name': 'is_rated'}) is None:
+        raise SystemExit('Form không có field is_rated. Tài khoản có thiếu permission judge.contest_rating không?')
+
+    if rated is not None and form.find(attrs={'name': 'is_rated'}) is not None:
+        items_del(items, 'is_rated')
+        if rated:
+            items_set(items, 'is_rated', 'on')
+
+    if rate_all is not None and form.find(attrs={'name': 'rate_all'}) is not None:
+        items_del(items, 'rate_all')
+        if rate_all:
+            items_set(items, 'rate_all', 'on')
+
+    if clear_rating_bounds:
+        if form.find(attrs={'name': 'rating_floor'}) is not None:
+            items_set(items, 'rating_floor', '')
+        if form.find(attrs={'name': 'rating_ceiling'}) is not None:
+            items_set(items, 'rating_ceiling', '')
+    else:
+        if rating_floor is not None:
+            if form.find(attrs={'name': 'rating_floor'}) is None:
+                raise SystemExit('Form không có field rating_floor.')
+            items_set(items, 'rating_floor', str(rating_floor))
+        if rating_ceiling is not None:
+            if form.find(attrs={'name': 'rating_ceiling'}) is None:
+                raise SystemExit('Form không có field rating_ceiling.')
+            items_set(items, 'rating_ceiling', str(rating_ceiling))
+
+
+def print_rating_status(items):
+    print('  is_rated -> %s' % ('on' if items_has(items, 'is_rated') else 'off'))
+    print('  rate_all -> %s' % ('on' if items_has(items, 'rate_all') else 'off'))
+    if items_get(items, 'rating_floor') not in (None, ''):
+        print('  rating_floor -> %r' % items_get(items, 'rating_floor'))
+    if items_get(items, 'rating_ceiling') not in (None, ''):
+        print('  rating_ceiling -> %r' % items_get(items, 'rating_ceiling'))
+
 def cmd_create(cli, opt):
     path = '/admin/judge/contest/add/'
     soup, form = cli.open_admin_form(path)
@@ -481,6 +553,18 @@ def cmd_create(cli, opt):
     items_del(items, 'is_visible')
     if opt.visible:
         items_set(items, 'is_visible', 'on')
+
+    # rating. --rate-all implies --rated because rate_all is meaningless when
+    # the contest is not rated. Bounds are optional filters.
+    rated = bool(opt.rated or opt.rate_all)
+    apply_rating_options(items, form,
+                         rated=(True if rated else None),
+                         rate_all=(True if opt.rate_all else None),
+                         rating_floor=opt.rating_floor,
+                         rating_ceiling=opt.rating_ceiling,
+                         require_fields=rated or opt.rating_floor is not None or opt.rating_ceiling is not None)
+    if rated or opt.rating_floor is not None or opt.rating_ceiling is not None:
+        print_rating_status(items)
 
     # problems inline
     prefix = detect_inline_prefix(form)
@@ -541,6 +625,49 @@ def cmd_set_visible(cli, opt, visible):
     print('OK: contest %s -> %s' % (opt.key, 'VISIBLE' if visible else 'HIDDEN'))
 
 
+def cmd_set_rated(cli, opt, rated):
+    pk = cli.contest_pk(opt.key)
+    path = '/admin/judge/contest/%s/change/' % pk
+    soup, form = cli.open_admin_form(path)
+    items = serialize_form(form)
+    items_set(items, 'csrfmiddlewaretoken', cli.csrf(soup))
+
+    if rated:
+        # None means preserve the current checkbox value. Explicit flags control
+        # whether rate_all is changed.
+        rate_all = None
+        if getattr(opt, 'rate_all', False):
+            rate_all = True
+        if getattr(opt, 'no_rate_all', False):
+            rate_all = False
+        apply_rating_options(items, form,
+                             rated=True,
+                             rate_all=rate_all,
+                             rating_floor=getattr(opt, 'rating_floor', None),
+                             rating_ceiling=getattr(opt, 'rating_ceiling', None),
+                             clear_rating_bounds=bool(getattr(opt, 'clear_rating_bounds', False)),
+                             require_fields=True)
+    else:
+        # Turning rating off should also clear rate_all to avoid stale confusing
+        # state in the admin form. Bounds are preserved unless the user asks to
+        # clear them, so re-enabling later can reuse the same thresholds.
+        apply_rating_options(items, form,
+                             rated=False,
+                             rate_all=False,
+                             clear_rating_bounds=bool(getattr(opt, 'clear_rating_bounds', False)),
+                             require_fields=True)
+
+    print_rating_status(items)
+    if getattr(opt, 'dry_run', False):
+        print('\n--dry-run: payload sẽ POST tới %s:' % path)
+        for k, v in items:
+            if k in ('is_rated', 'rate_all', 'rating_floor', 'rating_ceiling', 'csrfmiddlewaretoken'):
+                print('   %-40s %r' % (k, v))
+        return
+    cli.post_admin_form(path, items)
+    print('OK: contest %s -> %s' % (opt.key, 'RATED' if rated else 'UNRATED'))
+
+
 def main():
     # Các tham số chung nằm trong một "parent parser" và được gắn vào CẢ parser
     # gốc LẪN mọi subcommand, nên `--user/--password/--site/...` chạy được ở cả
@@ -571,7 +698,7 @@ def main():
                    help='In toàn bộ field thật của form tạo contest (chạy trước lần đầu!).')
 
     c = sub.add_parser('create', parents=[common], help='Tạo contest mới.')
-    c.add_argument('--key', required=True, help='mã contest (chữ thường, không dấu cách)')
+    c.add_argument('--key', required=True, help='mã contest: chỉ a-z, 0-9, _; không dùng dấu gạch ngang')
     c.add_argument('--name', required=True)
     c.add_argument('--start', required=True, help='"YYYY-MM-DD HH:MM"')
     c.add_argument('--end', required=True, help='"YYYY-MM-DD HH:MM"')
@@ -586,6 +713,10 @@ def main():
     c.add_argument('--description', help='mô tả markdown (mặc định = name)')
     c.add_argument('--description-file', help='đọc mô tả từ file .md')
     c.add_argument('--visible', action='store_true', help='public ngay (mặc định: ẩn)')
+    c.add_argument('--rated', action='store_true', help='bật tính rating cho contest ngay khi tạo')
+    c.add_argument('--rate-all', action='store_true', help='rate tất cả user đã tham gia; tự động bật --rated')
+    c.add_argument('--rating-floor', type=int, help='chỉ rate user có rating >= giá trị này')
+    c.add_argument('--rating-ceiling', type=int, help='chỉ rate user có rating <= giá trị này')
     c.add_argument('--dry-run', action='store_true', help='chỉ in payload, không POST')
 
     a = sub.add_parser('add-problems', parents=[common], help='Thêm bài vào contest đã có.')
@@ -599,6 +730,21 @@ def main():
         s = sub.add_parser(nm, parents=[common])
         s.add_argument('--key', required=True)
 
+    sr = sub.add_parser('set-rated', parents=[common], help='Bật tính rating cho contest đã có.')
+    sr.add_argument('--key', required=True)
+    rg = sr.add_mutually_exclusive_group()
+    rg.add_argument('--rate-all', action='store_true', help='bật rate_all')
+    rg.add_argument('--no-rate-all', action='store_true', help='tắt rate_all nhưng vẫn rated')
+    sr.add_argument('--rating-floor', type=int, help='chỉ rate user có rating >= giá trị này')
+    sr.add_argument('--rating-ceiling', type=int, help='chỉ rate user có rating <= giá trị này')
+    sr.add_argument('--clear-rating-bounds', action='store_true', help='xóa rating_floor/rating_ceiling')
+    sr.add_argument('--dry-run', action='store_true')
+
+    su = sub.add_parser('set-unrated', parents=[common], help='Tắt tính rating cho contest đã có.')
+    su.add_argument('--key', required=True)
+    su.add_argument('--clear-rating-bounds', action='store_true', help='xóa rating_floor/rating_ceiling')
+    su.add_argument('--dry-run', action='store_true')
+
     opt = ap.parse_args()
     # SUPPRESS nghĩa là attribute có thể vắng mặt -> tự áp default ở đây.
     opt.site = getattr(opt, 'site', None) or DEFAULT_SITE
@@ -609,6 +755,8 @@ def main():
     if not opt.user:
         ap.error('thiếu --user (đặt trước hoặc sau tên lệnh đều được, '
                  'vd: `contest_tool.py inspect --user ntannn`)')
+    if getattr(opt, 'key', None):
+        validate_contest_key(opt.key)
     password = opt.password or getpass.getpass('Admin password for %s: ' % opt.user)
     cli = Client(opt.site, debug=opt.debug)
     cli.login(opt.user, password)
@@ -623,6 +771,10 @@ def main():
         cmd_set_visible(cli, opt, True)
     elif opt.cmd == 'set-hidden':
         cmd_set_visible(cli, opt, False)
+    elif opt.cmd == 'set-rated':
+        cmd_set_rated(cli, opt, True)
+    elif opt.cmd == 'set-unrated':
+        cmd_set_rated(cli, opt, False)
 
 
 if __name__ == '__main__':
