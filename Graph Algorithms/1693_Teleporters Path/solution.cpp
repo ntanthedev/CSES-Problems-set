@@ -3,50 +3,65 @@
 #include <vector>
 using namespace std;
 
-vector<vector<int>> graph;
-vector<int> cycle;
-
-void fail() {
-    cout << "IMPOSSIBLE\n";
-    exit(0);
-}
-
-void find_cycle(int node) {
-    while (!graph[node].empty()) {
-        int next_node = graph[node].back();
-        graph[node].pop_back();
-        find_cycle(next_node);
-    }
-    cycle.push_back(node);
-}
-
 int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
     int n, m;
     cin >> n >> m;
 
-    graph.resize(n + 1);
-    vector<int> in_degree(n + 1);
-    vector<int> out_degree(n + 1);
-    for (int i = 1; i <= m; i++) {
+    vector<int> eu(m), ev(m);
+    vector<vector<int>> adj(n + 1);
+    vector<int> inDeg(n + 1), outDeg(n + 1);
+
+    for (int i = 0; i < m; i++) {
         int a, b;
         cin >> a >> b;
-        graph[a].push_back(b);
-        out_degree[a]++;
-        in_degree[b]++;
+        eu[i] = a;
+        ev[i] = b;
+        adj[a].push_back(i);
+        outDeg[a]++;
+        inDeg[b]++;
     }
 
-    in_degree[1]++;
-    out_degree[n]++;
+    inDeg[1]++;
+    outDeg[n]++;
+
     for (int i = 1; i <= n; i++) {
-        if (in_degree[i] != out_degree[i]) fail();
+        if (inDeg[i] != outDeg[i]) {
+            cout << "IMPOSSIBLE\n";
+            return 0;
+        }
     }
 
-    find_cycle(1);
-    if (cycle.size() != m + 1) fail();
+    vector<int> ptr(n + 1, 0);
+    vector<char> used(m, 0);
+    vector<int> path;
 
-    reverse(cycle.begin(), cycle.end());
-    for (auto node : cycle) {
-        cout << node << " ";
+    auto dfs = [&](auto &&self, int v) -> void {
+        while (ptr[v] < (int)adj[v].size()) {
+            int e = adj[v][ptr[v]++];
+            if (used[e])
+                continue;
+            used[e] = 1;
+            self(self, ev[e]);
+        }
+        path.push_back(v);
+    };
+
+    dfs(dfs, 1);
+    reverse(path.begin(), path.end());
+
+    if ((int)path.size() != m + 1 || path.front() != 1 || path.back() != n) {
+        cout << "IMPOSSIBLE\n";
+        return 0;
     }
-    cout << "\n";
+
+    for (int i = 0; i <= m; i++) {
+        if (i)
+            cout << ' ';
+        cout << path[i];
+    }
+    cout << '\n';
+    return 0;
 }
