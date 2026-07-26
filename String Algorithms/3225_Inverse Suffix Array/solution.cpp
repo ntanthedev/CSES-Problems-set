@@ -13,11 +13,16 @@ int main() {
         order[suffix_array[i]] = i;
     }
 
+    auto next_rank = [&](int pos) {
+        if (pos >= n) return 0;
+        return order[pos + 1];
+    };
+
     vector<char> result(n + 1);
     result[suffix_array[1]] = 'a';
     char current_char = 'a';
     for (int i = 2; i <= n; i++) {
-        if (order[suffix_array[i - 1] + 1] > order[suffix_array[i] + 1]) {
+        if (next_rank(suffix_array[i - 1]) > next_rank(suffix_array[i])) {
             current_char++;
         }
         if (current_char > 'z') {

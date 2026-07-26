@@ -1,0 +1,340 @@
+{
+  "_comment": "CSES problems requiring non-standard checkers. See CHECKER_STRATEGY.md \u00a72.",
+  "_status": {
+    "done_any_order": 4,
+    "done_floats": 5,
+    "done_multi_valid": 71,
+    "todo_interactive": 6
+  },
+  "1070": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1087": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1092": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1111": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1134": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1164": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1193": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1194": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1197": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1640": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1641": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1642": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1666": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1667": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1668": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1669": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1678": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1679": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1680": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1682": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1683": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1684": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1685": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1689": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1691": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1692": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1693": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1695": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1696": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1697": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1698": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1704": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1709": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1711": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1725": {
+    "checker": "floats",
+    "checker_args": {
+      "precision": 6
+    }
+  },
+  "1726": {
+    "checker": "floats",
+    "checker_args": {
+      "precision": 6
+    }
+  },
+  "1727": {
+    "checker": "floats",
+    "checker_args": {
+      "precision": 6
+    }
+  },
+  "1728": {
+    "checker": "floats",
+    "checker_args": {
+      "precision": 6
+    }
+  },
+  "1752": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1755": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "1756": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2075": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2076": {
+    "checker": "bridged",
+    "checker_type": "testlib",
+    "checker_file": "checker_unordered_pairs_symmetric.cpp"
+  },
+  "2077": {
+    "checker": "bridged",
+    "checker_type": "testlib",
+    "checker_file": "checker_unordered_flat.cpp"
+  },
+  "2079": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2106": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2129": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2130": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2131": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2165": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2177": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2179": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2195": {
+    "checker": "bridged",
+    "checker_type": "testlib",
+    "checker_file": "checker_unordered_pairs_atomic.cpp"
+  },
+  "2205": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2214": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2215": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2402": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2414": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2418": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2423": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2427": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2430": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "2432": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3154": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3159": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3213": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3225": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3294": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3308": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3311": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3312": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3355": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3358": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3361": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3399": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3403": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3404": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3422": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3423": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  },
+  "3424": {
+    "checker": "bridged",
+    "checker_type": "testlib"
+  }
+}

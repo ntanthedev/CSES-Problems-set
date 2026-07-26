@@ -1,47 +1,67 @@
+#include <algorithm>
 #include <iostream>
-#include <set>
 #include <vector>
 using namespace std;
 
-vector<set<int>> graph;
-vector<int> cycle;
-
-void fail() {
-    cout << "IMPOSSIBLE\n";
-    exit(0);
-}
-
-void find_cycle(int node) {
-    while (!graph[node].empty()) {
-        int next_node = *graph[node].begin();
-        graph[node].erase(next_node);
-        graph[next_node].erase(node);
-        find_cycle(next_node);
-    }
-    cycle.push_back(node);
-}
-
 int main() {
+    ios::sync_with_stdio(false);
+    cin.tie(nullptr);
+
     int n, m;
     cin >> n >> m;
 
-    graph.resize(n + 1);
-    for (int i = 1; i <= m; i++) {
+    vector<int> eu(m), ev(m);
+    vector<vector<int>> adj(n + 1);
+    for (int i = 0; i < m; i++) {
         int a, b;
         cin >> a >> b;
-        graph[a].insert(b);
-        graph[b].insert(a);
+        eu[i] = a;
+        ev[i] = b;
+        adj[a].push_back(i);
+        adj[b].push_back(i);
     }
 
     for (int i = 1; i <= n; i++) {
-        if (graph[i].size() % 2 != 0) fail();
+        if ((int)adj[i].size() % 2 != 0) {
+            cout << "IMPOSSIBLE\n";
+            return 0;
+        }
     }
 
-    find_cycle(1);
-    if (cycle.size() != m + 1) fail();
+    vector<int> ptr(n + 1, 0);
+    vector<char> used(m, 0);
+    vector<int> st;
+    st.push_back(1);
+    vector<int> circuit;
 
-    for (auto node : cycle) {
-        cout << node << " ";
+    while (!st.empty()) {
+        int v = st.back();
+        while (ptr[v] < (int)adj[v].size() && used[adj[v][ptr[v]]])
+            ptr[v]++;
+        if (ptr[v] == (int)adj[v].size()) {
+            circuit.push_back(v);
+            st.pop_back();
+        } else {
+            int e = adj[v][ptr[v]++];
+            if (used[e])
+                continue;
+            used[e] = 1;
+            int u = eu[e] ^ ev[e] ^ v;
+            st.push_back(u);
+        }
     }
-    cout << "\n";
+
+    if ((int)circuit.size() != m + 1) {
+        cout << "IMPOSSIBLE\n";
+        return 0;
+    }
+
+    reverse(circuit.begin(), circuit.end());
+    for (int i = 0; i <= m; i++) {
+        if (i)
+            cout << ' ';
+        cout << circuit[i];
+    }
+    cout << '\n';
+    return 0;
 }
